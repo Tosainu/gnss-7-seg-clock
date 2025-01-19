@@ -1,0 +1,11 @@
+# KiCad
+*-backups
+*-cache
+*.bak
+*.kicad_prl
+*.lck
+\#auto_saved_files#
+_autosave-*
+/hardware/gerber/*
+
+*.pdf

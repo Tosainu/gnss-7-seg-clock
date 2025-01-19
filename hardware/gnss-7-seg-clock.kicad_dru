@@ -1,0 +1,7 @@
+(version 1)
+
+(rule "Allow courtyard overlap for test points"
+    (severity exclusion)
+    (constraint courtyard_clearance)
+    (condition "A.Reference == 'TP*'")
+)
