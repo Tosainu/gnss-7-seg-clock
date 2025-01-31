@@ -6,8 +6,8 @@
 	(paper "A3")
 	(title_block
 		(title "GNSS Seven-segment Clock")
-		(date "2025-01-25")
-		(rev "A")
+		(date "2025-01-31")
+		(rev "A2")
 	)
 	(lib_symbols
 		(symbol "Connector:Conn_Coaxial"
@@ -9314,6 +9314,17 @@
 		)
 		(uuid "ff87fc6d-42a3-4af7-a7dd-a4fe22a4c0c8")
 	)
+	(text "Setting the output current of TLC5925\nIout = (1.21 / Rext) * 18\nIout = 9.9 mA (Rext = 2.2k)\nhttps://www.ti.com/lit/gpn/tlc5925"
+		(exclude_from_sim no)
+		(at 12.954 89.154 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "3ea9f6d0-6a85-4894-be20-9e93c4ee8157")
+	)
 	(label "GNSS_EXTINT"
 		(at 215.9 214.63 180)
 		(effects
@@ -11517,7 +11528,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "1k"
+		(property "Value" "2.2k"
 			(at 34.29 71.1199 0)
 			(effects
 				(font
@@ -12662,7 +12673,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "1k"
+		(property "Value" "2.2k"
 			(at 237.49 71.1199 0)
 			(effects
 				(font
@@ -21808,7 +21819,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "1k"
+		(property "Value" "2.2k"
 			(at 135.89 71.1199 0)
 			(effects
 				(font
