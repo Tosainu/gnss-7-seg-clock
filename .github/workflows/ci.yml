@@ -1,0 +1,47 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  kicad:
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/kicad/kicad:8.0.8@sha256:3b843afc5f436b8164d7a2cde364b38b0c69a561ac27cd15873ee6c0326467d8
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          persist-credentials: false
+      - name: Setup KiCad
+        # https://gitlab.com/kicad/packaging/kicad-cli-docker/-/blob/8c967a567a56fb463d3a062a8a87d8537cf6d1f9/Dockerfile.8.0-stable#L162-165
+        run: |
+          mkdir -p ~/.config/kicad/$(kicad-cli -v | cut -d . -f 1,2)
+          cp /usr/share/kicad/template/*-lib-table ~/.config/kicad/$(kicad-cli -v | cut -d . -f 1,2)
+      - name: Run Schematic ERC
+        run: >-
+          kicad-cli sch erc
+          --exit-code-violations
+          --format json
+          --output erc.json
+          hardware/gnss-7-seg-clock.kicad_sch
+      - name: Export Schematic PDF
+        run: >-
+          kicad-cli sch export pdf
+          --output schematic.pdf
+          hardware/gnss-7-seg-clock.kicad_sch
+      - name: Run PCB DRC
+        run: >-
+          kicad-cli pcb drc
+          --exit-code-violations
+          --format json
+          --output drc.json
+          hardware/gnss-7-seg-clock.kicad_pcb
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: kicad-outputs
+          path: |
+            *.json
+            *.pdf
