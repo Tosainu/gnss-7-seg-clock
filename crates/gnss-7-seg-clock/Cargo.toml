@@ -1,0 +1,36 @@
+[package]
+name = "gnss-7-seg-clock"
+version.workspace = true
+edition.workspace = true
+
+default-run = "gnss-7-seg-clock"
+
+[dependencies.cortex-m]
+workspace = true
+
+[dependencies.cortex-m-rt]
+workspace = true
+
+[dependencies.defmt]
+workspace = true
+
+[dependencies.defmt-rtt]
+workspace = true
+
+[dependencies.embassy-executor]
+workspace = true
+
+[dependencies.embassy-futures]
+workspace = true
+
+[dependencies.embassy-rp]
+workspace = true
+
+[dependencies.embassy-sync]
+workspace = true
+
+[dependencies.embassy-time]
+workspace = true
+
+[dependencies.panic-probe]
+workspace = true

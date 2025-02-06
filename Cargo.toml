@@ -1,0 +1,64 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/*",
+]
+default-members = ["crates/gnss-7-seg-clock"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies.cortex-m]
+version = "0.7.7"
+
+[workspace.dependencies.cortex-m-rt]
+version = "0.7.5"
+
+[workspace.dependencies.defmt]
+version = "0.3.10"
+
+[workspace.dependencies.defmt-rtt]
+version = "0.4.1"
+
+[workspace.dependencies.embassy-executor]
+version = "0.7.0"
+features = [
+  "arch-cortex-m",
+  "defmt",
+  "executor-interrupt",
+  "executor-thread",
+  "task-arena-size-98304",
+]
+
+[workspace.dependencies.embassy-futures]
+ version = "0.1.0"
+
+[workspace.dependencies.embassy-rp]
+version = "0.3.0"
+features = [
+  "boot2-w25q080",
+  "critical-section-impl",
+  "defmt",
+  "rp2040",
+  "time-driver",
+  "unstable-pac",
+]
+
+[workspace.dependencies.embassy-sync]
+version = "0.6.2"
+features = ["defmt"]
+
+[workspace.dependencies.embassy-time]
+version = "0.4.0"
+features = [
+  "defmt",
+  "defmt-timestamp-uptime"
+]
+
+[workspace.dependencies.panic-probe]
+version = "0.3.2"
+features = ["print-defmt"]
+
+[profile.release]
+debug = 2
