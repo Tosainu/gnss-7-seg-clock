@@ -33,6 +33,7 @@ features = [
 
 [workspace.dependencies.embassy-futures]
  version = "0.1.0"
+features = ["defmt"]
 
 [workspace.dependencies.embassy-rp]
 version = "0.3.0"
@@ -56,9 +57,27 @@ features = [
   "defmt-timestamp-uptime"
 ]
 
+[workspace.dependencies.embassy-usb]
+version = "0.4.0"
+default-features = false
+features = ["defmt"]
+
+[workspace.dependencies.embedded-io-async]
+version = "0.6.1"
+features = ["defmt-03"]
+
 [workspace.dependencies.panic-probe]
 version = "0.3.2"
 features = ["print-defmt"]
+
+# NOTE: needs to be added explicitly when using static_cell
+[workspace.dependencies.portable-atomic]
+version = "1.10.0"
+default-features = false
+features = ["critical-section"]
+
+[workspace.dependencies.static_cell]
+version = "2.1.0"
 
 [profile.release]
 debug = 2

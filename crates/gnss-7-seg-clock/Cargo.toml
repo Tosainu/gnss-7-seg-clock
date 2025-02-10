@@ -32,5 +32,17 @@ workspace = true
 [dependencies.embassy-time]
 workspace = true
 
+[dependencies.embassy-usb]
+workspace = true
+
+[dependencies.embedded-io-async]
+workspace = true
+
 [dependencies.panic-probe]
+workspace = true
+
+[dependencies.portable-atomic]
+workspace = true
+
+[dependencies.static_cell]
 workspace = true
