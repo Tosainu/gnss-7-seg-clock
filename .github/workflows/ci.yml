@@ -4,8 +4,28 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 jobs:
+  cargo-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - run: cargo check
+      # - run: cargo test --target "$(rustc -vV | grep host | cut -d' ' -f2)"
+
+  cargo-fmt:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - run: cargo fmt --check
+
+  cargo-clippy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - run: cargo clippy -- -D warnings
+
   kicad:
     runs-on: ubuntu-24.04
     container:
@@ -18,8 +38,9 @@ jobs:
       - name: Setup KiCad
         # https://gitlab.com/kicad/packaging/kicad-cli-docker/-/blob/8c967a567a56fb463d3a062a8a87d8537cf6d1f9/Dockerfile.8.0-stable#L162-165
         run: |
-          mkdir -p ~/.config/kicad/$(kicad-cli -v | cut -d . -f 1,2)
-          cp /usr/share/kicad/template/*-lib-table ~/.config/kicad/$(kicad-cli -v | cut -d . -f 1,2)
+          kicad_version=$(kicad-cli -v | cut -d . -f 1,2)
+          mkdir -p ~/.config/kicad/"$kicad_version"
+          cp /usr/share/kicad/template/*-lib-table ~/.config/kicad/"$kicad_version"
       - name: Run Schematic ERC
         run: >-
           kicad-cli sch erc
