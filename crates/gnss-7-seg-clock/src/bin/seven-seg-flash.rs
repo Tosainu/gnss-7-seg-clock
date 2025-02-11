@@ -59,6 +59,7 @@ async fn main(_spawner: Spawner) {
 
     loop {
         for i in 0..TABLE.len() {
+            #[allow(clippy::identity_op)]
             let tx_buf = [
                 TABLE[(i + 5) % TABLE.len()] | if i & 1 == 0 { MASK_DP } else { 0 },
                 TABLE[(i + 4) % TABLE.len()] | if i & 1 == 1 { MASK_DP } else { 0 },
