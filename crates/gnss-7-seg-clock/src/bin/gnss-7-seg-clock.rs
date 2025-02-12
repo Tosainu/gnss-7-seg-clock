@@ -270,22 +270,24 @@ async fn main(_spawner: Spawner) {
                 len,
             } = state
             {
-                defmt::info!("{:?}, {:?}", address, &buf[..len]);
+                if len > 7 && buf[1..7].iter().all(|&c| c.is_ascii_digit()) {
+                    defmt::info!("{:?}, {:?}", address, &buf[..len]);
 
-                let tx_buf = [
-                    to_digit(buf[6]),
-                    to_digit(buf[5]),
-                    to_digit(buf[4]) | MASK_DP,
-                    to_digit(buf[3]),
-                    to_digit(buf[2]) | MASK_DP,
-                    to_digit(buf[1]),
-                ];
+                    let tx_buf = [
+                        to_digit(buf[6]),
+                        to_digit(buf[5]),
+                        to_digit(buf[4]) | MASK_DP,
+                        to_digit(buf[3]),
+                        to_digit(buf[2]) | MASK_DP,
+                        to_digit(buf[1]),
+                    ];
 
-                display_spi.write(&tx_buf).await.unwrap();
+                    display_spi.write(&tx_buf).await.unwrap();
 
-                display_le.set_high();
-                Timer::after_nanos(15).await;
-                display_le.set_low();
+                    display_le.set_high();
+                    Timer::after_nanos(15).await;
+                    display_le.set_low();
+                }
             }
         }
     }
