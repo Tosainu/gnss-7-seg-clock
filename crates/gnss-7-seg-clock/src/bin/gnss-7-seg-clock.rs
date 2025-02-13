@@ -133,7 +133,7 @@ async fn main(_spawner: Spawner) {
 
     let gnss_uart_config = {
         let mut c = uart::Config::default();
-        c.baudrate = 9600;
+        c.baudrate = 115200;
         c.parity = uart::Parity::ParityNone;
         c.stop_bits = uart::StopBits::STOP1;
         c
@@ -178,7 +178,7 @@ async fn main(_spawner: Spawner) {
                 0x02, 0x00, 0x74, 0x10, 0x01, // CFG-UART1OUTPROT-NMEA (=1)
                 0xd9, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-NMEA_ID_ZDA_UART1 (=1)
                 // CFG-UART1-BAUDRATE (=115200)
-                // 0x01, 0x00, 0x52, 0x40, 0x00, 0xc2, 0x01, 0x00,
+                0x01, 0x00, 0x52, 0x40, 0x00, 0xc2, 0x01, 0x00,
                 // payload end
                 0x00, // ck_a
                 0x00, // ck_b
