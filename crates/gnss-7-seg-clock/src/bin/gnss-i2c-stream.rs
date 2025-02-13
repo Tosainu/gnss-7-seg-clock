@@ -106,7 +106,7 @@ async fn main(spawner: Spawner) {
             let mut frame = [
                 0xb5, 0x62, // header
                 0x06, 0x8a, // id/class (=UBX-CFG-VALSET)
-                0x1e, 0x00, // length
+                0x00, 0x00, // length
                 // payload begin
                 0x00, // version
                 0x01, // layers (=ram)
@@ -116,10 +116,13 @@ async fn main(spawner: Spawner) {
                 0x03, 0x00, 0xa2, 0x20, 0x05, // CFG-TXREADY-PIN (=5=EXTINT)
                 0x04, 0x00, 0xa2, 0x30, 0x10, 0x00, // CFG-TXREADY-THRESHOLD (=128/8)
                 0x05, 0x00, 0xa2, 0x20, 0x00, // CFG-TXREADY-INTERFACE (=0=I2C)
+                0xd8, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-NMEA_ID_ZDA_I2C (=1)
                 // payload end
                 0x00, // ck_a
                 0x00, // ck_b
             ];
+            let len = frame.len() as u16 - 8;
+            frame[4..6].copy_from_slice(&len.to_le_bytes());
             ubx_fill_ck(&mut frame);
             frame
         };
