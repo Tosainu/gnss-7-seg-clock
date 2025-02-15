@@ -4,14 +4,15 @@
 use embassy_executor::Spawner;
 use embassy_rp::gpio;
 use embassy_rp::i2c;
-use embassy_rp::peripherals::{I2C1, UART1};
+use embassy_rp::peripherals::{I2C1, SPI1, UART1};
 use embassy_rp::spi;
 use embassy_rp::uart;
-use embassy_time::Timer;
+use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, signal::Signal};
+use embassy_time::{Duration, Instant, Timer};
 use embedded_io_async::Read;
 use static_cell::StaticCell;
 
-use chrono::{FixedOffset, NaiveTime, Timelike};
+use chrono::{FixedOffset, NaiveTime, TimeDelta, Timelike};
 
 use misc::crlf_stream::CrlfStream;
 
@@ -60,21 +61,31 @@ const TABLE: [u8; 10] = [
 #[allow(dead_code)]
 const MASK_DP: u8 = 0b00100000;
 
-fn time_to_display_payload(time: NaiveTime) -> [u8; 6] {
-    [
-        TABLE[time.second() as usize % 10] | MASK_DP,
+struct DisplayPayload([u8; 6]);
+
+#[allow(dead_code)]
+enum DisplayCommand {
+    Set(DisplayPayload),
+    SetOnPulse(DisplayPayload, Instant),
+}
+
+static DISPLAY_SIGNAL: Signal<ThreadModeRawMutex, DisplayCommand> = Signal::new();
+
+fn time_to_display_payload(time: NaiveTime) -> DisplayPayload {
+    DisplayPayload([
+        TABLE[time.second() as usize % 10],
         TABLE[time.second() as usize / 10 % 10],
         TABLE[time.minute() as usize % 10] | MASK_DP,
         TABLE[time.minute() as usize / 10 % 10],
         TABLE[time.hour() as usize % 10] | MASK_DP,
         TABLE[time.hour() as usize / 10 % 10],
-    ]
+    ])
 }
 
 const TIME_ZOME: FixedOffset = FixedOffset::east_opt(9 * 60 * 60).unwrap();
 
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
 
     defmt::info!("Hello World!");
@@ -83,7 +94,7 @@ async fn main(_spawner: Spawner) {
     let mut display_le = gpio::Output::new(p.PIN_13, gpio::Level::Low);
     let mut gnss_nreset = gpio::Output::new(p.PIN_16, gpio::Level::Low);
     let mut _gnss_extint = gpio::Input::new(p.PIN_18, gpio::Pull::Up);
-    let mut _gnss_pps = gpio::Input::new(p.PIN_19, gpio::Pull::Down);
+    let gnss_pps = gpio::Input::new(p.PIN_19, gpio::Pull::Down);
 
     defmt::info!("configure 7-seg display");
 
@@ -210,6 +221,8 @@ async fn main(_spawner: Spawner) {
         defmt::assert_eq!(buf, ubx_ack_ack_frame);
     }
 
+    defmt::unwrap!(spawner.spawn(task_display(display_spi, display_le, gnss_pps)));
+
     let mut buf = CrlfStream::<512>::new();
 
     let mut fix_time = None;
@@ -233,16 +246,39 @@ async fn main(_spawner: Spawner) {
         }
 
         if let Some(time) = fix_time.take() {
-            let local = time + TIME_ZOME;
-            defmt::debug!("{}", defmt::Debug2Format(&local));
-            display_spi
-                .write(&time_to_display_payload(local))
-                .await
-                .unwrap();
-
-            display_le.set_high();
-            Timer::after_nanos(15).await;
-            display_le.set_low();
+            let local = time + TIME_ZOME + TimeDelta::seconds(1);
+            DISPLAY_SIGNAL.signal(DisplayCommand::SetOnPulse(
+                time_to_display_payload(local),
+                Instant::now() + Duration::from_secs(1),
+            ));
         }
+    }
+}
+
+#[embassy_executor::task]
+async fn task_display(
+    mut spi: spi::Spi<'static, SPI1, spi::Async>,
+    mut gpio_le: gpio::Output<'static>,
+    mut gpio_pulse: gpio::Input<'static>,
+) {
+    loop {
+        match DISPLAY_SIGNAL.wait().await {
+            DisplayCommand::Set(payload) => {
+                spi.write(&payload.0).await.unwrap();
+            }
+            DisplayCommand::SetOnPulse(payload, timeout) => {
+                spi.write(&payload.0).await.unwrap();
+
+                let _ = embassy_futures::select::select(
+                    gpio_pulse.wait_for_rising_edge(),
+                    Timer::at(timeout),
+                )
+                .await;
+            }
+        }
+
+        gpio_le.set_high();
+        Timer::after_nanos(15).await;
+        gpio_le.set_low();
     }
 }
