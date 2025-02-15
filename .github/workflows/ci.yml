@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
       - run: cargo check
-      # - run: cargo test --target "$(rustc -vV | grep host | cut -d' ' -f2)"
+      - run: "cargo test-libs --target \"$(rustc -vV | sed -n 's|host: ||p')\""
 
   cargo-fmt:
     runs-on: ubuntu-24.04

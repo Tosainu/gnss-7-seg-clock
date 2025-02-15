@@ -9,6 +9,13 @@ default-members = ["crates/gnss-7-seg-clock"]
 version = "0.1.0"
 edition = "2021"
 
+[workspace.dependencies.misc]
+path = "crates/misc"
+
+[workspace.dependencies.chrono]
+version = "0.4.39"
+default-features = false
+
 [workspace.dependencies.cortex-m]
 version = "0.7.7"
 
@@ -65,6 +72,23 @@ features = ["defmt"]
 [workspace.dependencies.embedded-io-async]
 version = "0.6.1"
 features = ["defmt-03"]
+
+[workspace.dependencies.nmea]
+git = "https://github.com/Tosainu/nmea.git"
+rev = "d2038a2df948d2908af5dec50f72a67d3f9218b7"
+default-features = false
+features = [
+  "defmt-03",
+  "GGA",
+  "GLL",
+  "GSA",
+  "GST",
+  "GSV",
+  "RMC",
+  "TXT",
+  "VTG",
+  "ZDA",
+]
 
 [workspace.dependencies.panic-probe]
 version = "0.3.2"

@@ -5,6 +5,12 @@ edition.workspace = true
 
 default-run = "gnss-7-seg-clock"
 
+[dependencies.misc]
+workspace = true
+
+[dependencies.chrono]
+workspace = true
+
 [dependencies.cortex-m]
 workspace = true
 
@@ -36,6 +42,9 @@ workspace = true
 workspace = true
 
 [dependencies.embedded-io-async]
+workspace = true
+
+[dependencies.nmea]
 workspace = true
 
 [dependencies.panic-probe]

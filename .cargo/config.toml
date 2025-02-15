@@ -1,3 +1,6 @@
+[alias]
+test-libs = ["test", "--workspace", "--exclude", "gnss-7-seg-clock"]
+
 [build]
 target = "thumbv6m-none-eabi"
 

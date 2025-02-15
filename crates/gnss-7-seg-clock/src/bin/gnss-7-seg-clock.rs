@@ -11,6 +11,10 @@ use embassy_time::Timer;
 use embedded_io_async::Read;
 use static_cell::StaticCell;
 
+use chrono::{FixedOffset, NaiveTime, Timelike};
+
+use misc::crlf_stream::CrlfStream;
+
 use {defmt_rtt as _, panic_probe as _};
 
 embassy_rp::bind_interrupts!(struct Irqs {
@@ -26,8 +30,8 @@ fn ubx_fill_ck(buf: &mut [u8]) {
     let mut ck_a = 0_u8;
     let mut ck_b = 0_u8;
     for c in &buf[2..buf.len() - 2] {
-        ck_a += c;
-        ck_b += ck_a;
+        ck_a = ck_a.overflowing_add(*c).0;
+        ck_b = ck_b.overflowing_add(ck_a).0;
     }
     buf[buf.len() - 2] = ck_a;
     buf[buf.len() - 1] = ck_b;
@@ -56,41 +60,18 @@ const TABLE: [u8; 10] = [
 #[allow(dead_code)]
 const MASK_DP: u8 = 0b00100000;
 
-fn to_digit(b: u8) -> u8 {
-    match b {
-        b'0' => TABLE[0],
-        b'1' => TABLE[1],
-        b'2' => TABLE[2],
-        b'3' => TABLE[3],
-        b'4' => TABLE[4],
-        b'5' => TABLE[5],
-        b'6' => TABLE[6],
-        b'7' => TABLE[7],
-        b'8' => TABLE[8],
-        b'9' => TABLE[9],
-        _ => 0b10000000_u8,
-    }
+fn time_to_display_payload(time: NaiveTime) -> [u8; 6] {
+    [
+        TABLE[time.second() as usize % 10] | MASK_DP,
+        TABLE[time.second() as usize / 10 % 10],
+        TABLE[time.minute() as usize % 10] | MASK_DP,
+        TABLE[time.minute() as usize / 10 % 10],
+        TABLE[time.hour() as usize % 10] | MASK_DP,
+        TABLE[time.hour() as usize / 10 % 10],
+    ]
 }
 
-#[derive(defmt::Format)]
-enum State<'a, const N: usize> {
-    NmeaNotFound,
-    Doller,
-    Address1(u8),
-    Address2(u8, u8),
-    Address3(u8, u8, u8),
-    Address4(u8, u8, u8, u8),
-    IncompletePayload {
-        address: (u8, u8, u8, u8, u8),
-        buf: &'a mut [u8; N],
-        len: usize,
-    },
-    Payload {
-        address: (u8, u8, u8, u8, u8),
-        buf: &'a mut [u8; N],
-        len: usize,
-    },
-}
+const TIME_ZOME: FixedOffset = FixedOffset::east_opt(9 * 60 * 60).unwrap();
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
@@ -139,14 +120,14 @@ async fn main(_spawner: Spawner) {
         c
     };
     let mut gnss_uart = {
-        static UART1_BUF_RX: StaticCell<[u8; 64]> = StaticCell::new();
+        static UART1_BUF_RX: StaticCell<[u8; 1024]> = StaticCell::new();
         uart::BufferedUart::new(
             p.UART1,
             Irqs,
             p.PIN_20,
             p.PIN_21,
             [].as_mut_slice(),
-            UART1_BUF_RX.init([0; 64]).as_mut_slice(),
+            UART1_BUF_RX.init([0; 1024]).as_mut_slice(),
             gnss_uart_config,
         )
     };
@@ -229,67 +210,39 @@ async fn main(_spawner: Spawner) {
         defmt::assert_eq!(buf, ubx_ack_ack_frame);
     }
 
-    let mut nmea_buf = [0; 512];
-    let mut state: State<'_, 512> = State::NmeaNotFound;
+    let mut buf = CrlfStream::<512>::new();
+
+    let mut fix_time = None;
+
     loop {
-        let mut buf = [0; 64];
-        let len = defmt::unwrap!(gnss_uart.read(&mut buf).await);
-        for c in &buf[..len] {
-            state = match (state, c) {
-                (State::NmeaNotFound | State::Payload { .. }, b'$') => State::Doller,
-                (State::NmeaNotFound | State::Payload { .. }, _) => State::Doller,
-                (State::Doller, _) => State::Address1(*c),
-                (State::Address1(c0), _) => State::Address2(c0, *c),
-                (State::Address2(c0, c1), _) => State::Address3(c0, c1, *c),
-                (State::Address3(c0, c1, c2), _) => State::Address4(c0, c1, c2, *c),
-                (State::Address4(c0, c1, c2, c3), _) => State::IncompletePayload {
-                    address: (c0, c1, c2, c3, *c),
-                    buf: &mut nmea_buf,
-                    len: 0,
-                },
-                (State::IncompletePayload { address, buf, len }, b'\n') => {
-                    buf[len] = *c;
-                    State::Payload {
-                        address,
-                        buf,
-                        len: len + 1,
+        let len = defmt::unwrap!(gnss_uart.read(buf.buf_unused_mut()).await);
+        buf.commit(len);
+
+        while let Some(line) = buf.pop() {
+            match nmea::parse_bytes(line) {
+                Ok(msg) => {
+                    defmt::debug!("{}", msg);
+                    if let nmea::ParseResult::RMC(data) = msg {
+                        fix_time = data.fix_time;
                     }
                 }
-                (State::IncompletePayload { address, buf, len }, _) => {
-                    buf[len] = *c;
-                    State::IncompletePayload {
-                        address,
-                        buf,
-                        len: len + 1,
-                    }
-                }
-            };
-
-            if let State::Payload {
-                address: address @ (_, _, b'R', b'M', b'C'),
-                ref buf,
-                len,
-            } = state
-            {
-                if len > 7 && buf[1..7].iter().all(|&c| c.is_ascii_digit()) {
-                    defmt::info!("{:?}, {:?}", address, &buf[..len]);
-
-                    let tx_buf = [
-                        to_digit(buf[6]),
-                        to_digit(buf[5]),
-                        to_digit(buf[4]) | MASK_DP,
-                        to_digit(buf[3]),
-                        to_digit(buf[2]) | MASK_DP,
-                        to_digit(buf[1]),
-                    ];
-
-                    display_spi.write(&tx_buf).await.unwrap();
-
-                    display_le.set_high();
-                    Timer::after_nanos(15).await;
-                    display_le.set_low();
-                }
+                // adding `Debug2Format` for now due to the error like:
+                // the trait `Format` is not implemented for `nom::internal::Err<nom::error::Error<&str>>`
+                Err(err) => defmt::warn!("{:a}: {}", line, defmt::Debug2Format(&err)),
             }
+        }
+
+        if let Some(time) = fix_time.take() {
+            let local = time + TIME_ZOME;
+            defmt::debug!("{}", defmt::Debug2Format(&local));
+            display_spi
+                .write(&time_to_display_payload(local))
+                .await
+                .unwrap();
+
+            display_le.set_high();
+            Timer::after_nanos(15).await;
+            display_le.set_low();
         }
     }
 }
