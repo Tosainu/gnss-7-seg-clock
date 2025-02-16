@@ -74,8 +74,8 @@ version = "0.6.1"
 features = ["defmt-03"]
 
 [workspace.dependencies.nmea]
-git = "https://github.com/Tosainu/nmea.git"
-rev = "d2038a2df948d2908af5dec50f72a67d3f9218b7"
+git = "https://github.com/AeroRust/nmea.git"
+rev = "17fb066fa2d4e5b92dcfd72627e83a07930327de"
 default-features = false
 features = [
   "defmt-03",

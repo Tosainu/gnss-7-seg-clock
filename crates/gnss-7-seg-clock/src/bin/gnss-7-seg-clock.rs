@@ -239,9 +239,7 @@ async fn main(spawner: Spawner) {
                         fix_time = data.fix_time;
                     }
                 }
-                // adding `Debug2Format` for now due to the error like:
-                // the trait `Format` is not implemented for `nom::internal::Err<nom::error::Error<&str>>`
-                Err(err) => defmt::warn!("{:a}: {}", line, defmt::Debug2Format(&err)),
+                Err(err) => defmt::warn!("{:a}: {}", line, err),
             }
         }
 

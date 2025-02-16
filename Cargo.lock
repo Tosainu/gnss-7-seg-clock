@@ -863,7 +863,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 [[package]]
 name = "nmea"
 version = "0.7.0"
-source = "git+https://github.com/Tosainu/nmea.git?rev=d2038a2df948d2908af5dec50f72a67d3f9218b7#d2038a2df948d2908af5dec50f72a67d3f9218b7"
+source = "git+https://github.com/AeroRust/nmea.git?rev=17fb066fa2d4e5b92dcfd72627e83a07930327de#17fb066fa2d4e5b92dcfd72627e83a07930327de"
 dependencies = [
  "arrayvec",
  "cfg-if",
