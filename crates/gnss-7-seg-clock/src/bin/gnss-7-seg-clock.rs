@@ -7,14 +7,13 @@ use embassy_rp::i2c;
 use embassy_rp::peripherals::{I2C1, SPI1, UART1};
 use embassy_rp::spi;
 use embassy_rp::uart;
-use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, signal::Signal};
+use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel, signal::Signal};
 use embassy_time::{Duration, Instant, Timer};
-use embedded_io_async::Read;
 use static_cell::StaticCell;
 
 use chrono::{FixedOffset, NaiveTime, TimeDelta, Timelike};
 
-use misc::crlf_stream::CrlfStream;
+use gnss_7_seg_clock::max_m10s::MaxM10s;
 
 use {defmt_rtt as _, panic_probe as _};
 
@@ -23,20 +22,7 @@ embassy_rp::bind_interrupts!(struct Irqs {
     UART1_IRQ => uart::BufferedInterruptHandler<UART1>;
 });
 
-fn ubx_fill_ck(buf: &mut [u8]) {
-    if buf.len() < 4 {
-        return;
-    }
-
-    let mut ck_a = 0_u8;
-    let mut ck_b = 0_u8;
-    for c in &buf[2..buf.len() - 2] {
-        ck_a = ck_a.overflowing_add(*c).0;
-        ck_b = ck_b.overflowing_add(ck_a).0;
-    }
-    buf[buf.len() - 2] = ck_a;
-    buf[buf.len() - 1] = ck_b;
-}
+type NmeaChannel = Channel<ThreadModeRawMutex, nmea::ParseResult, 16>;
 
 //
 //     +- A -+
@@ -92,8 +78,6 @@ async fn main(spawner: Spawner) {
 
     let mut display_noe = gpio::Output::new(p.PIN_11, gpio::Level::High);
     let mut display_le = gpio::Output::new(p.PIN_13, gpio::Level::Low);
-    let mut gnss_nreset = gpio::Output::new(p.PIN_16, gpio::Level::Low);
-    let mut _gnss_extint = gpio::Input::new(p.PIN_18, gpio::Pull::Up);
     let gnss_pps = gpio::Input::new(p.PIN_19, gpio::Pull::Down);
 
     defmt::info!("configure 7-seg display");
@@ -118,137 +102,39 @@ async fn main(spawner: Spawner) {
         display_noe.set_low();
     }
 
-    defmt::info!("configure MAX-M10S");
-
-    let mut gnss_i2c =
-        i2c::I2c::new_async(p.I2C1, p.PIN_23, p.PIN_22, Irqs, i2c::Config::default());
-
-    let gnss_uart_config = {
-        let mut c = uart::Config::default();
-        c.baudrate = 115200;
-        c.parity = uart::Parity::ParityNone;
-        c.stop_bits = uart::StopBits::STOP1;
-        c
-    };
-    let mut gnss_uart = {
+    let _uart1_tx = gpio::Input::new(p.PIN_20, gpio::Pull::Up);
+    let max_m10s = {
         static UART1_BUF_RX: StaticCell<[u8; 1024]> = StaticCell::new();
-        uart::BufferedUart::new(
+        MaxM10s::new(
             p.UART1,
-            Irqs,
-            p.PIN_20,
             p.PIN_21,
-            [].as_mut_slice(),
             UART1_BUF_RX.init([0; 1024]).as_mut_slice(),
-            gnss_uart_config,
+            p.I2C1,
+            p.PIN_23,
+            p.PIN_22,
+            p.PIN_16,
+            p.PIN_18,
+            Irqs,
         )
     };
 
-    gnss_nreset.set_high();
-
-    {
-        let ubx_cfg_valset_frame = {
-            let mut frame = [
-                0xb5, 0x62, // header
-                0x06, 0x8a, // id/class (=UBX-CFG-VALSET)
-                0x00, 0x00, // length
-                // payload begin
-                0x00, // version
-                0x01, // layers (=ram)
-                0x00, 0x00, // reserved
-                // CFG-TXREADY-ENABLED (=true)
-                0x02, 0x00, 0xa2, 0x10, 0x01, // CFG-TXREADY-POLARIT (=true=low-active)
-                0x03, 0x00, 0xa2, 0x20, 0x05, // CFG-TXREADY-PIN (=5=EXTINT)
-                0x04, 0x00, 0xa2, 0x30, 0x01, 0x00, // CFG-TXREADY-THRESHOLD (=8/8)
-                0x05, 0x00, 0xa2, 0x20, 0x00, // CFG-TXREADY-INTERFACE (=0=I2C)
-                0x01, 0x00, 0x71, 0x10, 0x01, // CFG-I2CINPROT-UBX (=1)
-                0x02, 0x00, 0x71, 0x10, 0x00, // CFG-I2CINPROT-NMEA (=0)
-                0x01, 0x00, 0x72, 0x10, 0x01, // CFG-I2COUTPROT-UBX (=1)
-                0x02, 0x00, 0x72, 0x10, 0x00, // CFG-I2COUTPROT-NMEA (=0)
-                0x01, 0x00, 0x73, 0x10, 0x00, // CFG-UART1INPROT-UBX (=0)
-                0x02, 0x00, 0x73, 0x10, 0x01, // CFG-UART1INPROT-NMEA (=1)
-                0x01, 0x00, 0x74, 0x10, 0x00, // CFG-UART1OUTPROT-UBX (=0)
-                0x02, 0x00, 0x74, 0x10, 0x01, // CFG-UART1OUTPROT-NMEA (=1)
-                0xd9, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-NMEA_ID_ZDA_UART1 (=1)
-                // CFG-UART1-BAUDRATE (=115200)
-                0x01, 0x00, 0x52, 0x40, 0x00, 0xc2, 0x01, 0x00,
-                // payload end
-                0x00, // ck_a
-                0x00, // ck_b
-            ];
-            let len = frame.len() as u16 - 8;
-            frame[4..6].copy_from_slice(&len.to_le_bytes());
-            ubx_fill_ck(&mut frame);
-            frame
-        };
-
-        let ubx_ack_ack_frame = {
-            let mut frame = [
-                0xb5, 0x62, // header
-                0x05, 0x01, // id/class (=UBX-ACK-ACK)
-                0x02, 0x00, // length
-                // payload begin
-                0x06, 0x8a, // id/class (=UBX-CFG-VALSET)
-                // payload end
-                0x00, // ck_a
-                0x00, // ck_b
-            ];
-            ubx_fill_ck(&mut frame);
-            frame
-        };
-
-        while gnss_i2c
-            .write_async(0x42_u16, ubx_cfg_valset_frame)
-            .await
-            .is_err()
-        {
-            Timer::after_millis(100).await; // wait for the bus to become ready
-        }
-
-        loop {
-            let mut len = [0; 2];
-            defmt::unwrap!(
-                gnss_i2c
-                    .write_read_async(0x42_u16, [0xfd_u8], &mut len)
-                    .await
-            );
-            if u16::from_be_bytes(len) >= 10 {
-                break;
-            }
-        }
-
-        let mut buf = [0; 10];
-        defmt::unwrap!(gnss_i2c.read_async(0x42_u16, &mut buf).await);
-        defmt::assert_eq!(buf, ubx_ack_ack_frame);
-    }
+    static NMEA_CHANNEL: NmeaChannel = NmeaChannel::new();
 
     defmt::unwrap!(spawner.spawn(task_display(display_spi, display_le, gnss_pps)));
-
-    let mut buf = CrlfStream::<512>::new();
-
-    let mut fix_time = None;
+    defmt::unwrap!(spawner.spawn(task_max_m10s(max_m10s, &NMEA_CHANNEL)));
 
     loop {
-        let len = defmt::unwrap!(gnss_uart.read(buf.buf_unused_mut()).await);
-        buf.commit(len);
+        let msg = NMEA_CHANNEL.receive().await;
+        defmt::debug!("{}", msg);
 
-        while let Some(line) = buf.pop() {
-            match nmea::parse_bytes(line) {
-                Ok(msg) => {
-                    defmt::debug!("{}", msg);
-                    if let nmea::ParseResult::RMC(data) = msg {
-                        fix_time = data.fix_time;
-                    }
-                }
-                Err(err) => defmt::warn!("{:a}: {}", line, err),
+        if let nmea::ParseResult::RMC(data) = msg {
+            if let Some(time) = data.fix_time {
+                let local = time + TIME_ZOME + TimeDelta::seconds(1);
+                DISPLAY_SIGNAL.signal(DisplayCommand::SetOnPulse(
+                    time_to_display_payload(local),
+                    Instant::now() + Duration::from_secs(1),
+                ));
             }
-        }
-
-        if let Some(time) = fix_time.take() {
-            let local = time + TIME_ZOME + TimeDelta::seconds(1);
-            DISPLAY_SIGNAL.signal(DisplayCommand::SetOnPulse(
-                time_to_display_payload(local),
-                Instant::now() + Duration::from_secs(1),
-            ));
         }
     }
 }
@@ -279,4 +165,9 @@ async fn task_display(
         Timer::after_nanos(15).await;
         gpio_le.set_low();
     }
+}
+
+#[embassy_executor::task]
+async fn task_max_m10s(mut max_m10s: MaxM10s<'static, UART1, I2C1>, channel: &'static NmeaChannel) {
+    max_m10s.run(channel.sender()).await;
 }

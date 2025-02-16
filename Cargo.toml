@@ -87,7 +87,6 @@ features = [
   "RMC",
   "TXT",
   "VTG",
-  "ZDA",
 ]
 
 [workspace.dependencies.panic-probe]
