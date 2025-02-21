@@ -1,5 +1,5 @@
 use embassy_futures::select::*;
-use embassy_rp::{gpio, i2c, interrupt::typelevel::Binding, uart, Peripheral};
+use embassy_rp::{Peripheral, gpio, i2c, interrupt::typelevel::Binding, uart};
 use embassy_sync::{blocking_mutex::raw::RawMutex, channel::Sender};
 use embassy_time::{Duration, Instant, Timer};
 use embedded_io_async::Read;
@@ -57,8 +57,8 @@ where
         gpio_nreset: impl Peripheral<P = impl gpio::Pin> + 'd,
         gpio_extint: impl Peripheral<P = impl gpio::Pin> + 'd,
         irq: impl Binding<Uart::Interrupt, uart::BufferedInterruptHandler<Uart>>
-            + Binding<I2c::Interrupt, i2c::InterruptHandler<I2c>>
-            + Copy,
+        + Binding<I2c::Interrupt, i2c::InterruptHandler<I2c>>
+        + Copy,
     ) -> Self {
         let uart_config = {
             let mut c = uart::Config::default();

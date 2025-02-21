@@ -1,4 +1,4 @@
-use embassy_rp::{dma, gpio, spi, Peripheral};
+use embassy_rp::{Peripheral, dma, gpio, spi};
 use embassy_time::Timer;
 
 pub struct Payload(pub [u8; 6]);
