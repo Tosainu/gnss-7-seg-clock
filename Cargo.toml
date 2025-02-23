@@ -39,7 +39,7 @@ features = [
 ]
 
 [workspace.dependencies.embassy-futures]
- version = "0.1.0"
+version = "0.1.1"
 features = ["defmt"]
 
 [workspace.dependencies.embassy-rp]
@@ -110,6 +110,10 @@ default-features = false
 
 [workspace.dependencies.static_cell]
 version = "2.1.0"
+
+[patch.crates-io.embassy-futures]
+git = "https://github.com/embassy-rs/embassy.git"
+rev = "2e7a2b61275d70d7d09cb676490e2cba4d2bde3f"
 
 [profile.dev]
 codegen-units = 1

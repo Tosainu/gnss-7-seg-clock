@@ -2,19 +2,23 @@
 #![no_main]
 
 use embassy_executor::Spawner;
-use embassy_futures::select::*;
 use embassy_rp::flash;
 use embassy_rp::gpio;
 use embassy_rp::i2c;
 use embassy_rp::peripherals::{I2C1, UART1};
+use embassy_rp::spi;
 use embassy_rp::uart;
-use embassy_sync::{blocking_mutex::raw::ThreadModeRawMutex, channel::Channel};
+use embassy_sync::{
+    blocking_mutex::raw::{RawMutex, ThreadModeRawMutex},
+    channel::Channel,
+};
 use static_cell::StaticCell;
 
 use chrono::{Datelike, FixedOffset, NaiveDate, NaiveTime, TimeDelta, Timelike};
 
 use gnss_7_seg_clock::{
     display::{self, Display},
+    events::*,
     flash::NonVolatileConfig,
     max_m10s::MaxM10s,
 };
@@ -48,8 +52,19 @@ const TABLE: [u8; 10] = [
     0b11011111_u8, // '8'
     0b11011011_u8, // '9'
 ];
+
 #[allow(dead_code)]
 const MASK_DP: u8 = 0b00100000;
+
+// "--.--.--"
+const PATTERN_NO_TIME: display::Payload = display::Payload([
+    0b10000000_u8,
+    0b10000000_u8,
+    0b10100000_u8,
+    0b10000000_u8,
+    0b10100000_u8,
+    0b10000000_u8,
+]);
 
 fn date_to_display_payload(date: NaiveDate) -> display::Payload {
     display::Payload([
@@ -87,17 +102,19 @@ impl Config {
     }
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, defmt::Format)]
 enum DisplayMode {
-    Date,
     Time,
+    Date,
+    ConfigTimeZone,
 }
 
 impl DisplayMode {
     fn next_state(&self) -> DisplayMode {
         match self {
-            DisplayMode::Date => DisplayMode::Time,
             DisplayMode::Time => DisplayMode::Date,
+            DisplayMode::Date => DisplayMode::ConfigTimeZone,
+            DisplayMode::ConfigTimeZone => DisplayMode::Time,
         }
     }
 }
@@ -109,23 +126,15 @@ async fn main(spawner: Spawner) {
     defmt::info!("Hello World!");
 
     let mut nvcfg = NonVolatileConfig::<_, _, FLASH_SIZE, ADDR_OFFSET, 512>::new(p.FLASH);
-    let cfg: Config = defmt::unwrap!(nvcfg.read_or_default());
+    let mut cfg: Config = defmt::unwrap!(nvcfg.read_or_default());
     defmt::info!("{}", cfg);
 
-    let mut sw3 = gpio::Input::new(p.PIN_0, gpio::Pull::None);
+    let sw3 = gpio::Input::new(p.PIN_0, gpio::Pull::None);
+    let sw4 = gpio::Input::new(p.PIN_6, gpio::Pull::None);
+    let sw5 = gpio::Input::new(p.PIN_7, gpio::Pull::None);
 
     let _spi1_rx = gpio::Input::new(p.PIN_12, gpio::Pull::Down);
     let mut display = Display::new(p.SPI1, p.PIN_14, p.PIN_15, p.DMA_CH0, p.PIN_11, p.PIN_13);
-
-    // "--.--.--"
-    const PATTERN_NO_TIME: display::Payload = display::Payload([
-        0b10000000_u8,
-        0b10000000_u8,
-        0b10100000_u8,
-        0b10000000_u8,
-        0b10100000_u8,
-        0b10000000_u8,
-    ]);
 
     display.shift(&PATTERN_NO_TIME).await;
     display.refresh().await;
@@ -155,76 +164,125 @@ async fn main(spawner: Spawner) {
     max_m10s_pps.wait_for_low().await;
 
     let mut mode = DisplayMode::Time;
-    let mut datetime = None;
-    let mut refresh_on_pps = false;
+    let mut es = EventSources::new(NMEA_CHANNEL.receiver(), sw3, sw4, sw5, max_m10s_pps);
 
     loop {
-        match select3(
-            NMEA_CHANNEL.receive(),
-            sw3.wait_for_falling_edge(),
-            max_m10s_pps.wait_for_rising_edge(),
-        )
-        .await
-        {
-            Either3::First(msg) => {
-                defmt::debug!("{}", msg);
-                if let nmea::ParseResult::RMC(data) = msg {
-                    if let (Some(date), Some(time)) = (data.fix_date, data.fix_time) {
-                        let t = date.and_time(time) + cfg.time_zone();
-                        let t_next = t + TimeDelta::seconds(1);
-
-                        match mode {
-                            DisplayMode::Date => {
-                                display.shift(&date_to_display_payload(t.date())).await;
-                                display.refresh().await;
-                                display.shift(&date_to_display_payload(t_next.date())).await;
-                                refresh_on_pps = true;
-                            }
-                            DisplayMode::Time => {
-                                display.shift(&time_to_display_payload(t.time())).await;
-                                display.refresh().await;
-                                display.shift(&time_to_display_payload(t_next.time())).await;
-                                refresh_on_pps = true;
-                            }
-                        }
-
-                        datetime = Some(t);
-                    }
-                }
-            }
-
-            Either3::Second(..) => {
-                mode = mode.next_state();
-                if let Some(t) = datetime {
-                    let t_next = t + TimeDelta::seconds(1);
-                    match mode {
-                        DisplayMode::Date => {
-                            display.shift(&date_to_display_payload(t.date())).await;
-                            display.refresh().await;
-                            display.shift(&date_to_display_payload(t_next.date())).await;
-                            refresh_on_pps = true;
-                        }
-                        DisplayMode::Time => {
-                            display.shift(&time_to_display_payload(t.time())).await;
-                            display.refresh().await;
-                            display.shift(&time_to_display_payload(t_next.time())).await;
-                            refresh_on_pps = true;
-                        }
-                    }
-                } else {
-                    display.shift(&PATTERN_NO_TIME).await;
-                    display.refresh().await;
-                    refresh_on_pps = false;
-                }
-            }
-
-            Either3::Third(..) => {
-                if refresh_on_pps {
-                    display.refresh().await;
-                    refresh_on_pps = false;
+        defmt::info!("mode: {}", mode);
+        match mode {
+            DisplayMode::Time => handle_mode_time(&mut es, &cfg, &mut display).await,
+            DisplayMode::Date => handle_mode_date(&mut es, &cfg, &mut display).await,
+            DisplayMode::ConfigTimeZone => {
+                let t = handle_mode_config_time_zone(&mut es, &cfg, &mut display).await;
+                if t != cfg.time_zone_secs {
+                    cfg.time_zone_secs = t;
+                    defmt::unwrap!(nvcfg.write(&cfg));
                 }
             }
         }
+        mode = mode.next_state();
+    }
+}
+
+async fn handle_mode_time<R: RawMutex, Spi: spi::Instance, const N: usize>(
+    es: &mut EventSources<'_, R, N>,
+    cfg: &Config,
+    display: &mut Display<'_, Spi>,
+) {
+    if let Some(t) = es.datetime {
+        let t = t + cfg.time_zone();
+        let t_next = t + TimeDelta::seconds(1);
+        display.shift(&time_to_display_payload(t.time())).await;
+        display.refresh().await;
+        display.shift(&time_to_display_payload(t_next.time())).await;
+    } else {
+        display.shift(&PATTERN_NO_TIME).await;
+        display.refresh().await;
+    }
+
+    loop {
+        match es.wait().await {
+            Event::DateTimeUpdated(t) => {
+                let t = t + cfg.time_zone();
+                let t_next = t + TimeDelta::seconds(1);
+                display.shift(&time_to_display_payload(t.time())).await;
+                display.refresh().await;
+                display.shift(&time_to_display_payload(t_next.time())).await;
+            }
+            Event::TimePulse => {
+                display.refresh().await;
+            }
+            Event::Sw3Pressed => return,
+            _ => (),
+        }
+    }
+}
+
+async fn handle_mode_date<R: RawMutex, Spi: spi::Instance, const N: usize>(
+    es: &mut EventSources<'_, R, N>,
+    cfg: &Config,
+    display: &mut Display<'_, Spi>,
+) {
+    if let Some(t) = es.datetime {
+        let t = t + cfg.time_zone();
+        let t_next = t + TimeDelta::seconds(1);
+        display.shift(&date_to_display_payload(t.date())).await;
+        display.refresh().await;
+        display.shift(&date_to_display_payload(t_next.date())).await;
+    } else {
+        display.shift(&PATTERN_NO_TIME).await;
+        display.refresh().await;
+    }
+
+    loop {
+        match es.wait().await {
+            Event::DateTimeUpdated(t) => {
+                let t = t + cfg.time_zone();
+                let t_next = t + TimeDelta::seconds(1);
+                display.shift(&date_to_display_payload(t.date())).await;
+                display.refresh().await;
+                display.shift(&date_to_display_payload(t_next.date())).await;
+            }
+            Event::TimePulse => {
+                display.refresh().await;
+            }
+            Event::Sw3Pressed => return,
+            _ => (),
+        }
+    }
+}
+
+async fn handle_mode_config_time_zone<R: RawMutex, Spi: spi::Instance, const N: usize>(
+    es: &mut EventSources<'_, R, N>,
+    cfg: &Config,
+    display: &mut Display<'_, Spi>,
+) -> i32 {
+    let mut time_zone_secs = cfg.time_zone_secs;
+    'outer: loop {
+        let hour = time_zone_secs / 60 / 60;
+        let min = (time_zone_secs / 60 % 60).unsigned_abs();
+        let payload = display::Payload([
+            TABLE[min as usize % 10],
+            TABLE[min as usize / 10 % 10],
+            TABLE[hour.unsigned_abs() as usize % 10] | MASK_DP,
+            TABLE[hour.unsigned_abs() as usize / 10 % 10],
+            if time_zone_secs.is_negative() {
+                0b10000000_u8
+            } else {
+                0b00000000_u8
+            },
+            0,
+        ]);
+        display.shift(&payload).await;
+        display.refresh().await;
+
+        time_zone_secs = 'inner: loop {
+            match es.wait().await {
+                Event::Sw3Pressed => break 'outer time_zone_secs,
+                Event::Sw4Pressed => break 'inner (time_zone_secs + 30 * 60).min(24 * 60 * 60),
+                Event::Sw5Pressed => break 'inner (time_zone_secs - 30 * 60).max(-24 * 60 * 60),
+                _ => (),
+            }
+        };
     }
 }
 
