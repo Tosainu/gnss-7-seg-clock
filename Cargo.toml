@@ -102,5 +102,13 @@ features = ["critical-section"]
 [workspace.dependencies.static_cell]
 version = "2.1.0"
 
-[profile.release]
+[profile.dev]
+codegen-units = 1
 debug = 2
+incremental = false
+
+[profile.release]
+codegen-units = 1
+debug = 2
+incremental = false
+lto = true
