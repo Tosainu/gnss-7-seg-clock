@@ -53,5 +53,11 @@ workspace = true
 [dependencies.portable-atomic]
 workspace = true
 
+[dependencies.postcard]
+workspace = true
+
+[dependencies.serde]
+workspace = true
+
 [dependencies.static_cell]
 workspace = true

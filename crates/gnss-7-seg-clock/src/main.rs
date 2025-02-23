@@ -3,6 +3,7 @@
 
 use embassy_executor::Spawner;
 use embassy_futures::select::*;
+use embassy_rp::flash;
 use embassy_rp::gpio;
 use embassy_rp::i2c;
 use embassy_rp::peripherals::{I2C1, UART1};
@@ -14,6 +15,7 @@ use chrono::{Datelike, FixedOffset, NaiveDate, NaiveTime, TimeDelta, Timelike};
 
 use gnss_7_seg_clock::{
     display::{self, Display},
+    flash::NonVolatileConfig,
     max_m10s::MaxM10s,
 };
 
@@ -71,7 +73,19 @@ fn time_to_display_payload(time: NaiveTime) -> display::Payload {
     ])
 }
 
-const TIME_ZOME: FixedOffset = FixedOffset::east_opt(9 * 60 * 60).unwrap();
+const FLASH_SIZE: usize = 4 * 1024 * 1024; // W25Q32JVSS
+const ADDR_OFFSET: u32 = (FLASH_SIZE - flash::ERASE_SIZE) as u32;
+
+#[derive(Copy, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize, defmt::Format)]
+struct Config {
+    time_zone_secs: i32,
+}
+
+impl Config {
+    fn time_zone(&self) -> FixedOffset {
+        FixedOffset::east_opt(self.time_zone_secs).unwrap()
+    }
+}
 
 #[derive(Copy, Clone, PartialEq)]
 enum DisplayMode {
@@ -93,6 +107,10 @@ async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
 
     defmt::info!("Hello World!");
+
+    let mut nvcfg = NonVolatileConfig::<_, _, FLASH_SIZE, ADDR_OFFSET, 512>::new(p.FLASH);
+    let cfg: Config = defmt::unwrap!(nvcfg.read_or_default());
+    defmt::info!("{}", cfg);
 
     let mut sw3 = gpio::Input::new(p.PIN_0, gpio::Pull::None);
 
@@ -152,7 +170,7 @@ async fn main(spawner: Spawner) {
                 defmt::debug!("{}", msg);
                 if let nmea::ParseResult::RMC(data) = msg {
                     if let (Some(date), Some(time)) = (data.fix_date, data.fix_time) {
-                        let t = date.and_time(time) + TIME_ZOME;
+                        let t = date.and_time(time) + cfg.time_zone();
                         let t_next = t + TimeDelta::seconds(1);
 
                         match mode {
