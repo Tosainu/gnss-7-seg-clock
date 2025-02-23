@@ -7,12 +7,33 @@ on:
   workflow_dispatch:
 
 jobs:
-  cargo-test:
+  cargo-build-and-test:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4.2.2
-      - run: cargo check
+        with:
+          persist-credentials: false
+      - name: Install picotool
+        run: |
+          cd "$(mktemp -d)"
+          git clone --single-branch --branch 2.1.1 --depth 1 https://github.com/raspberrypi/pico-sdk.git
+          git -C pico-sdk submodule update --init --depth 1 lib/mbedtls
+          git clone --single-branch --branch 2.1.1 --depth 1 https://github.com/raspberrypi/picotool.git
+          cmake -S picotool -B build -D CMAKE_BUILD_TYPE=Release -D PICOTOOL_NO_LIBUSB=ON -D PICO_SDK_PATH="$PWD/pico-sdk" -D CMAKE_INSTALL_PREFIX="$HOME/.local"
+          cmake --build build
+          cmake --install build
+          picotool
+      - name: Install flip-link
+        run: cargo install --locked flip-link@0.1.10
       - run: "cargo test-libs --target \"$(rustc -vV | sed -n 's|host: ||p')\""
+      - run: cargo build --release --bins --examples
+      - run: picotool uf2 convert target/thumbv6m-none-eabi/release/gnss-7-seg-clock -t elf target/thumbv6m-none-eabi/release/gnss-7-seg-clock.uf2
+      - uses: actions/upload-artifact@v4.6.0
+        with:
+          name: firmware
+          path: |
+            target/thumbv6m-none-eabi/release/gnss-7-seg-clock
+            target/thumbv6m-none-eabi/release/gnss-7-seg-clock.uf2
 
   cargo-fmt:
     runs-on: ubuntu-24.04
