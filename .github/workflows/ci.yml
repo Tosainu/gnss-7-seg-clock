@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - v*
   pull_request:
   workflow_dispatch:
 
@@ -46,6 +48,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.2
       - run: cargo clippy -- -D warnings
+
+  release-firmware:
+    runs-on: ubuntu-24.04
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    needs:
+      - cargo-build-and-test
+    steps:
+      - uses: actions/download-artifact@v4.1.8
+        with:
+          name: firmware
+      - uses: softprops/action-gh-release@daffc988f27cd136af07d2cdcbf7ceae2993875d
+        with:
+          draft: true
+          files: |
+            gnss-7-seg-clock
+            gnss-7-seg-clock.uf2
 
   kicad:
     runs-on: ubuntu-24.04
