@@ -2,9 +2,42 @@
 
 GNSS-powered, seven-segment table clock.
 
+https://github.com/user-attachments/assets/9b2d0560-d879-4ddb-b99d-07a6e9839360
+
+Full video: https://www.youtube.com/watch?v=Y1P_iDvq4bk
+
 ## Firmware
 
-TODO.
+### Usage
+
+Pre-build firmware files are available on the [release page](https://github.com/Tosainu/gnss-7-seg-clock/releases). Thanks to the RP2040 Bootrom, flashing the firmware requires no special tool. Connect the board to the PC using the USB-C cable, while holding the BOOT button (`SW2`). Once the `RPI-RP2` drive appears on the PC, copy `gnss-7-seg-clock.uf2` there. The board will automatically be rebooted as soon as it finishes writing to Flash.
+
+- The board displays `--.--.--` until it obtains the time information.
+- Press `SW3` to change the display contents:
+    1. Time: `hh.mm.ss`
+    2. Date: `YY.MM.DD`
+    3. Configuring time zone (time offset): `[-]hh.mm`
+        - `SW4`: + 30 min
+        - `SW5`: - 30 min
+
+### Build
+
+The firmware is written in the [Rust][rust] programming language with the [Embassy][embassy] framework. In order to build the firmware, you first need to prepare the Rust toolchain. Please refer to the [official guide][rustup].
+
+Next, install the linker helper [`flip-link`][flip-link]. Alternatively, remove [this line](https://github.com/Tosainu/gnss-7-seg-clock/blob/446c9426d9386b7eddf7218308c7567423a233c5/.cargo/config.toml#L11) to use the default linker.
+
+    $ cargo install --locked flip-link
+
+Lastly, run the command below to build the firmware. You can find the ELF file `./target/thumbv6m-none-eabi/release/gnss-7-seg-clock` afterward.
+
+    $ cargo build --release
+
+If the debug probe is attached to the board and [probe-rs][probe-rs] is installed on your PC, `cargo run` can be used to load firmware to the board.
+
+    $ cargo run --release
+    
+    # to run test apps in crates/gnss-7-seg-clock/examples/
+    $ cargo run --release --example gnss-uart-pipe
 
 ## Schematic and PCB
 
@@ -12,6 +45,13 @@ TODO.
 > I'm new to circuits and PCB designs. Any feedback and advice are welcome! (✿ゝ◡╹)ノ
 
 I designed the Rev.A board with KiCad v8.0.8 (Linux/macOS) and their official libraries. You can find the KiCad project files in the [`hardware/`](./hardware/) directory. You can also find the rendered schematic (PDF) and Gerber files on the [release page](https://github.com/Tosainu/gnss-7-seg-clock/releases/tag/hardware%2Frev-a).
+
+![DSC_7465](https://github.com/user-attachments/assets/b8ba4ea2-d15b-40a8-b685-3bc720fe4624)
+
+![DSC_7464](https://github.com/user-attachments/assets/bad113b0-ff11-46c8-9ca2-d24075941334)
+<sub>
+Please do not take a close look at 43-44 pins of RP2040! (ignorable solder bridge)
+</sub>
 
 ### Parts
 
@@ -78,11 +118,13 @@ TLC5925 determines the output currents based on an external resistor between the
 | This board | Reference design | Use |
 | --- | --- | --- |
 | `C20` | `C14` |  RF Bias-T Capacitor |
-| `C21` | `C18` | DC Block Capacitor |
+| `C21` | `C18` | DC Block Capacitor[^dc-block-cap] |
 | `L1` | `L3` | RF Bias-T Inductor |
 | `R11` | `R8` | Antenna supervisor current limiter/shunt resistor |
 
 `D1` is the ESD-protection TVS which is only in the SparkFun's board. Since I have no confidence in finding compatible parts, I used the same TVS [Littelfuse PESD0402-140][PESD0402-140] in this design.
+
+[^dc-block-cap]: Apparently, this capacitor can be removed as my design doesn't have an external SAW filter. The built-in DC-block capacitor of the module is sufficient.
 
 ## License
 
@@ -97,6 +139,12 @@ PCD design files, specifically the files under the [`hardware/`](./hardware/) di
 - Circuits around the MAX-M10S module on the schematic are made based on [sparkfun/SparkFun\_u-blox\_MAX-M10S][SparkFun-MAX-M10S] which is licensed under the [CC BY-SA 4.0](https://github.com/sparkfun/SparkFun_u-blox_MAX-M10S/blob/8e937406ba0f21e3afc8ca20ddeb06b088023951/LICENSE.md#hardware) license for the hardware part.
 
 This project is inspired by [Kello version 4](http://kair.us/projects/clock/v4/index.html).
+
+[rust]: https://www.rust-lang.org/
+[rustup]: https://www.rust-lang.org/tools/install
+[embassy]: https://embassy.dev/
+[flip-link]: https://github.com/knurling-rs/flip-link
+[probe-rs]: https://probe.rs/
 
 [RP2040]: https://www.raspberrypi.com/products/rp2040/
 [LQG15HS27NJ02D]: https://www.murata.com/en-global/products/productdetail?partno=LQG15HS27NJ02%23
