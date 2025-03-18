@@ -126,6 +126,22 @@ TLC5925 determines the output currents based on an external resistor between the
 
 [^dc-block-cap]: Apparently, this capacitor can be removed as my design doesn't have an external SAW filter. The built-in DC-block capacitor of the module is sufficient.
 
+## Special Thanks - PCBWay
+
+I would like to say a special thank you to [PCBWay](https://www.pcbway.com/) for reaching out and sponsoring my project. As part of the sponsorship, I had the opportunity to try their PCBA service. Overall I am very satisfied with the service and quality of the PCBs. Especially,
+
+- Swift and kind support
+    - I was surprised that they reviewed my design files very quickly and gave me a reply after about an hour from the order.
+- Numerous customization options for PCB manufacturing
+- Help Center
+    - There are how-to specialized for KiCad such as [_"How to Generate Gerber and Drill Files in KiCad 8.0?"_](https://www.pcbway.com/helpcenter/generate_gerber/Generate_Gerber_file_from_Kicad.html) and [_"Generate Position File Centroid File(pick place) in Kicad"_](https://www.pcbway.com/helpcenter/design_instruction/Generate_Position_File_in_Kicad.html). They were very helpful when I generate design files for the order.
+- Quality of PCBs
+    - The board has RP2040 which is the 0.20 mm pitch IC but there were no major issues. One thing to note is the soldermask color: green would be the only choice for such boards according to their explanations and the document [_"Soldermask Issues - Soldermask bridge"_](https://www.pcbway.com/helpcenter/soldermask_issues/Soldermask_bridge.html).
+
+![250316-133125-DSC_8347](https://github.com/user-attachments/assets/12140d7a-a3ff-4dff-ac41-3c42d2702b02)
+
+Note that I made some changes from the Rev.A design for this order, such as changing footprints to a non-HandSolder variant. If you're interested in about the design files I used to order, please refer to the [Rev.A2 release](https://github.com/Tosainu/gnss-7-seg-clock/releases/tag/hardware%2Frev-a2).
+
 ## License
 
 The project is licensed under the [MIT](./LICENSE) license unless otherwise stated.
