@@ -305,6 +305,18 @@
 		(uuid "ad7b7ce4-900b-4d4e-98b1-e28983bd07fc")
 	)
 	(model "${KICAD8_3DMODEL_DIR}/Button_Switch_SMD.3dshapes/SW_SPST_PTS810.wrl"
+		(hide yes)
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+	(model "${KIPRJMOD}/3d_models/PTS810.step"
 		(offset
 			(xyz 0 0 0)
 		)

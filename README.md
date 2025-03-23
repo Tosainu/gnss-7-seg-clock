@@ -152,6 +152,18 @@ PCD design files, specifically the files under the [`hardware/`](./hardware/) di
     - [`QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm_HandSolder.kicad_mod`](./hardware/gnss-7-seg-clock.pretty/QFN-56-1EP_7x7mm_P0.4mm_EP3.2x3.2mm_HandSolder.kicad_mod)
     - [`SW_SPST_PTS810_HandSolder.kicad_mod`](./hardware/gnss-7-seg-clock.pretty/SW_SPST_PTS810_HandSolder.kicad_mod)
     - [`USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal_HandSolder.kicad_mod`](./hardware/gnss-7-seg-clock.pretty/USB_C_Receptacle_GCT_USB4105-xx-A_16P_TopMnt_Horizontal_HandSolder.kicad_mod)
+- 3D model of ublox MAX module [`MAX (STEP-AP214).STEP`](./hardware/3d_models/MAX%20(STEP-AP214).STEP) is copied from [u-blox/3D-Step-Models-Library@92ce6ba0](https://github.com/u-blox/3D-Step-Models-Library/tree/92ce6ba04a1dacdbec4c5b9e0c032d87bb4d9fc0).
+
+    > Copyright (C) u-blox
+    >
+    > u-blox reserves all rights in this deliverable (documentation, software, etc., hereafter “Deliverable”).
+    >
+    > u-blox grants you the right to use, copy, modify and distribute the Deliverable provided hereunder for any purpose without fee.
+    >
+    > THIS DELIVERABLE IS BEING PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED WARRANTY. IN PARTICULAR, NEITHER THE AUTHOR NOR U-BLOX MAKES ANY REPRESENTATION OR WARRANTY OF ANY KIND CONCERNING THE MERCHANTABILITY OF THIS DELIVERABLE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
+    >
+    > In case you provide us a feedback or make a contribution in the form of a further development of the Deliverable (“Contribution”), u-blox will have the same rights as granted to you, namely to use, copy, modify and distribute the Contribution provided to us for any purpose without fee.
+
 - Circuits around the MAX-M10S module on the schematic are made based on [sparkfun/SparkFun\_u-blox\_MAX-M10S][SparkFun-MAX-M10S] which is licensed under the [CC BY-SA 4.0](https://github.com/sparkfun/SparkFun_u-blox_MAX-M10S/blob/8e937406ba0f21e3afc8ca20ddeb06b088023951/LICENSE.md#hardware) license for the hardware part.
 
 This project is inspired by [Kello version 4](http://kair.us/projects/clock/v4/index.html).

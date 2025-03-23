@@ -339,4 +339,15 @@
 		(layers "F.Cu" "F.Paste" "F.Mask")
 		(uuid "1b0bf68c-3ad7-4390-ac94-d0b6c3642d93")
 	)
+	(model "${KIPRJMOD}/3d_models/MAX (STEP-AP214).STEP"
+		(offset
+			(xyz -0.15 0.055 0.4)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 180)
+		)
+	)
 )

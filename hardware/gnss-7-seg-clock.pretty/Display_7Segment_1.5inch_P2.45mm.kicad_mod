@@ -438,15 +438,15 @@
 		(remove_unused_layers no)
 		(uuid "a6deadbd-c84f-455f-aa66-2808f0ffaf0a")
 	)
-	(model "${KIPRJMOD}/3d_models/LSD150.step"
+	(model "${KIPRJMOD}/3d_models/LSD150BAG-101.step"
 		(offset
-			(xyz 0.31 0 0)
+			(xyz 0.32 0 0)
 		)
 		(scale
 			(xyz 1 1 1)
 		)
 		(rotate
-			(xyz 0 0 0)
+			(xyz 0 0 90)
 		)
 	)
 )
