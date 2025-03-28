@@ -2,6 +2,8 @@
 
 GNSS-powered, seven-segment table clock.
 
+![DSC_8405](https://github.com/user-attachments/assets/dfdbf40c-fb0f-4bc4-b784-38103c194dda)
+
 https://github.com/user-attachments/assets/9b2d0560-d879-4ddb-b99d-07a6e9839360
 
 Full video: https://www.youtube.com/watch?v=Y1P_iDvq4bk
