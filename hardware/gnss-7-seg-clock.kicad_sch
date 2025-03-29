@@ -3779,7 +3779,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "Memory_Flash:W25Q16JVSS"
+		(symbol "Memory_Flash:W25Q32JVSS"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -3791,7 +3791,7 @@
 					)
 				)
 			)
-			(property "Value" "W25Q16JVSS"
+			(property "Value" "W25Q32JVSS"
 				(at 7.62 11.43 0)
 				(effects
 					(font
@@ -3799,7 +3799,7 @@
 					)
 				)
 			)
-			(property "Footprint" "Package_SO:SOIC-8_5.23x5.23mm_P1.27mm"
+			(property "Footprint" "Package_SO:SOIC-8_5.3x5.3mm_P1.27mm"
 				(at 0 0 0)
 				(effects
 					(font
@@ -3808,7 +3808,7 @@
 					(hide yes)
 				)
 			)
-			(property "Datasheet" "https://www.winbond.com/hq/support/documentation/levelOne.jsp?__locale=en&DocNo=DA00-W25Q16JV.1"
+			(property "Datasheet" "http://www.winbond.com/resource-files/w25q32jv%20revg%2003272018%20plus.pdf"
 				(at 0 0 0)
 				(effects
 					(font
@@ -3817,7 +3817,7 @@
 					(hide yes)
 				)
 			)
-			(property "Description" "16Mb Serial Flash Memory, Standard/Dual/Quad SPI, SOIC-8"
+			(property "Description" "32Mbit / 4MiB Serial Flash Memory, Standard/Dual/Quad SPI, 2.7-3.6V, SOIC-8 (208 mil)"
 				(at 0 0 0)
 				(effects
 					(font
@@ -3835,7 +3835,7 @@
 					(hide yes)
 				)
 			)
-			(property "ki_fp_filters" "SOIC*5.23x5.23mm*P1.27mm*"
+			(property "ki_fp_filters" "*SOIC*5.3x5.3mm*P1.27mm*"
 				(at 0 0 0)
 				(effects
 					(font
@@ -3844,10 +3844,10 @@
 					(hide yes)
 				)
 			)
-			(symbol "W25Q16JVSS_0_1"
+			(symbol "W25Q32JVSS_0_1"
 				(rectangle
 					(start -7.62 10.16)
-					(end 7.62 -10.16)
+					(end 10.16 -10.16)
 					(stroke
 						(width 0.254)
 						(type default)
@@ -3857,7 +3857,7 @@
 					)
 				)
 			)
-			(symbol "W25Q16JVSS_1_1"
+			(symbol "W25Q32JVSS_1_1"
 				(pin input line
 					(at -10.16 7.62 0)
 					(length 2.54)
@@ -3897,7 +3897,7 @@
 				(pin bidirectional line
 					(at -10.16 2.54 0)
 					(length 2.54)
-					(name "DI(IO0)"
+					(name "DI/IO_{0}"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -3915,7 +3915,7 @@
 				(pin bidirectional line
 					(at -10.16 0 0)
 					(length 2.54)
-					(name "DO(IO1)"
+					(name "DO/IO_{1}"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -3933,7 +3933,7 @@
 				(pin bidirectional line
 					(at -10.16 -2.54 0)
 					(length 2.54)
-					(name "IO2"
+					(name "~{WP}/IO_{2}"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -3951,7 +3951,7 @@
 				(pin bidirectional line
 					(at -10.16 -5.08 0)
 					(length 2.54)
-					(name "IO3"
+					(name "~{HOLD}/~{RESET}/IO_{3}"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -22704,7 +22704,7 @@
 		)
 	)
 	(symbol
-		(lib_id "Memory_Flash:W25Q16JVSS")
+		(lib_id "Memory_Flash:W25Q32JVSS")
 		(at 76.2 251.46 0)
 		(unit 1)
 		(exclude_from_sim no)
@@ -22714,7 +22714,7 @@
 		(fields_autoplaced yes)
 		(uuid "f788728d-d881-4d7f-a8d0-9966a7d6dcec")
 		(property "Reference" "U12"
-			(at 85.09 250.1899 0)
+			(at 87.63 250.1899 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -22723,7 +22723,7 @@
 			)
 		)
 		(property "Value" "W25Q32JVSS"
-			(at 85.09 252.7299 0)
+			(at 87.63 252.7299 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -22731,7 +22731,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Package_SO:SOIC-8_5.275x5.275mm_P1.27mm"
+		(property "Footprint" "Package_SO:SOIC-8_5.3x5.3mm_P1.27mm"
 			(at 76.2 251.46 0)
 			(effects
 				(font
@@ -22740,7 +22740,7 @@
 				(hide yes)
 			)
 		)
-		(property "Datasheet" ""
+		(property "Datasheet" "http://www.winbond.com/resource-files/w25q32jv%20revg%2003272018%20plus.pdf"
 			(at 76.2 251.46 0)
 			(effects
 				(font
@@ -22749,7 +22749,7 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "4Mb Serial Flash Memory, Standard/Dual/Quad SPI, SOIC-8"
+		(property "Description" "32Mbit / 4MiB Serial Flash Memory, Standard/Dual/Quad SPI, 2.7-3.6V, SOIC-8 (208 mil)"
 			(at 76.2 251.46 0)
 			(effects
 				(font
