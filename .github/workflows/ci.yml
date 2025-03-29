@@ -70,7 +70,7 @@ jobs:
   kicad:
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/kicad/kicad:8.0.8@sha256:3b843afc5f436b8164d7a2cde364b38b0c69a561ac27cd15873ee6c0326467d8
+      image: ghcr.io/kicad/kicad:9.0@sha256:97cedd027d7dc7e8d5fc804932f838bd208f2ca024ee8d01001c4d52ac8e666a
       options: --user root
     steps:
       - uses: actions/checkout@v4.2.2
