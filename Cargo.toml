@@ -23,7 +23,7 @@ version = "0.7.7"
 version = "0.7.5"
 
 [workspace.dependencies.defmt]
-version = "0.3.10"
+version = "1.0.1"
 
 [workspace.dependencies.defmt-rtt]
 version = "0.4.1"
