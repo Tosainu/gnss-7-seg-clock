@@ -133,6 +133,14 @@ async fn main(spawner: Spawner) {
     let sw4 = gpio::Input::new(p.PIN_6, gpio::Pull::None);
     let sw5 = gpio::Input::new(p.PIN_7, gpio::Pull::None);
 
+    let mut leds = [
+        gpio::Output::new(gpio::AnyPin::from(p.PIN_1), gpio::Level::Low),
+        gpio::Output::new(gpio::AnyPin::from(p.PIN_2), gpio::Level::Low),
+        gpio::Output::new(gpio::AnyPin::from(p.PIN_3), gpio::Level::Low),
+        gpio::Output::new(gpio::AnyPin::from(p.PIN_4), gpio::Level::Low),
+        gpio::Output::new(gpio::AnyPin::from(p.PIN_5), gpio::Level::Low),
+    ];
+
     let _spi1_rx = gpio::Input::new(p.PIN_12, gpio::Pull::Down);
     let mut display = Display::new(p.SPI1, p.PIN_14, p.PIN_15, p.DMA_CH0, p.PIN_11, p.PIN_13);
 
@@ -168,6 +176,7 @@ async fn main(spawner: Spawner) {
 
     loop {
         defmt::info!("mode: {}", mode);
+        set_leds(&mut leds, mode);
         match mode {
             DisplayMode::Time => handle_mode_time(&mut es, &cfg, &mut display).await,
             DisplayMode::Date => handle_mode_date(&mut es, &cfg, &mut display).await,
@@ -181,6 +190,39 @@ async fn main(spawner: Spawner) {
         }
         mode = mode.next_state();
     }
+}
+
+fn set_leds(leds: &mut [gpio::Output<'_>; 5], mode: DisplayMode) {
+    let bits = match mode {
+        DisplayMode::Time => 0b0_0001_u8,
+        DisplayMode::Date => 0b0_0010_u8,
+        DisplayMode::ConfigTimeZone => 0b1_0001_u8,
+    };
+    leds[0].set_level(if bits & 0b1_0000 > 0 {
+        gpio::Level::High
+    } else {
+        gpio::Level::Low
+    });
+    leds[1].set_level(if bits & 0b0_1000 > 0 {
+        gpio::Level::High
+    } else {
+        gpio::Level::Low
+    });
+    leds[2].set_level(if bits & 0b0_0100 > 0 {
+        gpio::Level::High
+    } else {
+        gpio::Level::Low
+    });
+    leds[3].set_level(if bits & 0b0_0010 > 0 {
+        gpio::Level::High
+    } else {
+        gpio::Level::Low
+    });
+    leds[4].set_level(if bits & 0b0_0001 > 0 {
+        gpio::Level::High
+    } else {
+        gpio::Level::Low
+    });
 }
 
 async fn handle_mode_time<R: RawMutex, Spi: spi::Instance, const N: usize>(
