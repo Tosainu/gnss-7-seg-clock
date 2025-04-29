@@ -12,6 +12,9 @@ edition = "2024"
 [workspace.dependencies.misc]
 path = "crates/misc"
 
+[workspace.dependencies.nmea-wip]
+path = "crates/nmea"
+
 [workspace.dependencies.chrono]
 version = "0.4.41"
 default-features = false
@@ -88,6 +91,10 @@ features = [
   "TXT",
   "VTG",
 ]
+
+[workspace.dependencies.nom]
+version = "8.0.0"
+default-features = false
 
 [workspace.dependencies.panic-probe]
 version = "0.3.2"

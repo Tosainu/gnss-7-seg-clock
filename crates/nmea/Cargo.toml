@@ -1,0 +1,17 @@
+[package]
+name = "nmea"
+version.workspace = true
+edition.workspace = true
+
+[features]
+defmt = ["dep:defmt"]
+
+[dependencies.chrono]
+workspace = true
+
+[dependencies.defmt]
+optional = true
+workspace = true
+
+[dependencies.nom]
+workspace = true
