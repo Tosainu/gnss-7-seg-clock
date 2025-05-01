@@ -13,7 +13,7 @@ edition = "2024"
 path = "crates/misc"
 
 [workspace.dependencies.chrono]
-version = "0.4.40"
+version = "0.4.41"
 default-features = false
 
 [workspace.dependencies.cortex-m]
