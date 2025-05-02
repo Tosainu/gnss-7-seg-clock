@@ -57,7 +57,7 @@ jobs:
     needs:
       - cargo-build-and-test
     steps:
-      - uses: actions/download-artifact@v4.2.1
+      - uses: actions/download-artifact@v4.3.0
         with:
           name: firmware
       - uses: softprops/action-gh-release@39ba0b9d81217c984acfad95ddcc7db226387497
