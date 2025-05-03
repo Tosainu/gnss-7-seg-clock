@@ -12,7 +12,7 @@ edition = "2024"
 [workspace.dependencies.misc]
 path = "crates/misc"
 
-[workspace.dependencies.nmea-wip]
+[workspace.dependencies.nmea]
 path = "crates/nmea"
 
 [workspace.dependencies.chrono]
@@ -75,22 +75,6 @@ features = ["defmt"]
 [workspace.dependencies.embedded-io-async]
 version = "0.6.1"
 features = ["defmt-03"]
-
-[workspace.dependencies.nmea]
-git = "https://github.com/AeroRust/nmea.git"
-rev = "17fb066fa2d4e5b92dcfd72627e83a07930327de"
-default-features = false
-features = [
-  "defmt-03",
-  "GGA",
-  "GLL",
-  "GSA",
-  "GST",
-  "GSV",
-  "RMC",
-  "TXT",
-  "VTG",
-]
 
 [workspace.dependencies.nom]
 version = "8.0.0"

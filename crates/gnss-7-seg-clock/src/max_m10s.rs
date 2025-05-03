@@ -4,6 +4,8 @@ use embassy_sync::{blocking_mutex::raw::RawMutex, channel::Sender};
 use embassy_time::{Duration, Instant, Timer};
 use embedded_io_async::Read;
 
+use chrono::NaiveDateTime;
+
 use misc::crlf_stream::CrlfStream;
 
 pub fn ubx_fill_ck(buf: &mut [u8]) {
@@ -41,6 +43,10 @@ enum State {
     Ready,
 }
 
+pub enum Event {
+    DateTime(NaiveDateTime),
+}
+
 impl<'d, Uart, I2c> MaxM10s<'d, Uart, I2c>
 where
     Uart: uart::Instance,
@@ -76,10 +82,7 @@ where
         }
     }
 
-    pub async fn run<M: RawMutex, const N: usize>(
-        &mut self,
-        sender: Sender<'_, M, nmea::ParseResult, N>,
-    ) {
+    pub async fn run<M: RawMutex, const N: usize>(&mut self, sender: Sender<'_, M, Event, N>) {
         let mut state = State::PowerCycle;
         loop {
             let next_state = match state {
@@ -205,7 +208,7 @@ where
 
     async fn do_reveive_nmea<M: RawMutex, const N: usize>(
         &mut self,
-        sender: &Sender<'_, M, nmea::ParseResult, N>,
+        sender: &Sender<'_, M, Event, N>,
     ) -> State {
         let mut buf = CrlfStream::<512>::new();
         let mut errors = 0_u32;
@@ -225,8 +228,16 @@ where
             }
 
             while let Some(line) = buf.pop() {
-                match nmea::parse_bytes(line) {
-                    Ok(msg) => sender.send(msg).await,
+                defmt::debug!("{:a}", line);
+                match nmea::parser::parse(line) {
+                    Ok(msg) => {
+                        if let nmea::parser::MessageType::Rmc(data) = msg.data {
+                            defmt::info!("{}", data);
+                            if let (Some(date), Some(time)) = (data.date, data.time) {
+                                sender.send(Event::DateTime(date.and_time(time))).await;
+                            }
+                        }
+                    }
                     Err(err) => defmt::warn!("{:a}: {}", line, err),
                 }
             }

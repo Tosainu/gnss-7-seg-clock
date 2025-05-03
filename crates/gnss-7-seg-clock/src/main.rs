@@ -20,7 +20,7 @@ use gnss_7_seg_clock::{
     display::{self, Display},
     events::*,
     flash::NonVolatileConfig,
-    max_m10s::MaxM10s,
+    max_m10s::{Event as MaxM10sEvent, MaxM10s},
 };
 
 use {defmt_rtt as _, panic_probe as _};
@@ -30,7 +30,7 @@ embassy_rp::bind_interrupts!(struct Irqs {
     UART1_IRQ => uart::BufferedInterruptHandler<UART1>;
 });
 
-type NmeaChannel = Channel<ThreadModeRawMutex, nmea::ParseResult, 16>;
+type NmeaChannel = Channel<ThreadModeRawMutex, MaxM10sEvent, 8>;
 
 //
 //     +- A -+

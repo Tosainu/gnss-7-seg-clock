@@ -8,6 +8,10 @@ default-run = "gnss-7-seg-clock"
 [dependencies.misc]
 workspace = true
 
+[dependencies.nmea]
+features = ["defmt"]
+workspace = true
+
 [dependencies.chrono]
 workspace = true
 
@@ -42,9 +46,6 @@ workspace = true
 workspace = true
 
 [dependencies.embedded-io-async]
-workspace = true
-
-[dependencies.nmea]
 workspace = true
 
 [dependencies.panic-probe]

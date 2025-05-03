@@ -5,6 +5,8 @@ use embassy_time::Timer;
 
 use chrono::NaiveDateTime;
 
+use crate::max_m10s::Event as MaxM10sEvent;
+
 pub enum Event {
     DateTimeUpdated(NaiveDateTime),
     Sw3Pressed,
@@ -14,7 +16,7 @@ pub enum Event {
 }
 
 pub struct EventSources<'d, M: RawMutex, const N: usize> {
-    receiver_nmea: Receiver<'d, M, nmea::ParseResult, N>,
+    receiver_nmea: Receiver<'d, M, MaxM10sEvent, N>,
     gpio_sw3: DebouncedInput<'d>,
     gpio_sw4: DebouncedInput<'d>,
     gpio_sw5: DebouncedInput<'d>,
@@ -24,7 +26,7 @@ pub struct EventSources<'d, M: RawMutex, const N: usize> {
 
 impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
     pub fn new(
-        receiver_nmea: Receiver<'d, M, nmea::ParseResult, N>,
+        receiver_nmea: Receiver<'d, M, MaxM10sEvent, N>,
         gpio_sw3: gpio::Input<'d>,
         gpio_sw4: gpio::Input<'d>,
         gpio_sw5: gpio::Input<'d>,
@@ -51,16 +53,7 @@ impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
             )
             .await
             {
-                Either5::First(msg) => {
-                    defmt::debug!("{}", msg);
-                    if let nmea::ParseResult::RMC(data) = msg {
-                        if let (Some(date), Some(time)) = (data.fix_date, data.fix_time) {
-                            let t = date.and_time(time);
-                            self.datetime = Some(t);
-                            return Event::DateTimeUpdated(t);
-                        }
-                    }
-                }
+                Either5::First(MaxM10sEvent::DateTime(t)) => return Event::DateTimeUpdated(t),
                 Either5::Second(..) => return Event::Sw3Pressed,
                 Either5::Third(..) => return Event::Sw4Pressed,
                 Either5::Fourth(..) => return Event::Sw5Pressed,
