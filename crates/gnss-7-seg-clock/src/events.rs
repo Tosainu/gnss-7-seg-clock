@@ -43,6 +43,7 @@ impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
     }
 
     pub async fn wait(&mut self) -> Event {
+        #[allow(clippy::never_loop)]
         loop {
             match select5(
                 self.receiver_nmea.receive(),
