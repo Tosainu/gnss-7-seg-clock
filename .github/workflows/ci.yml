@@ -69,41 +69,39 @@ jobs:
 
   kicad:
     runs-on: ubuntu-24.04
-    container:
-      image: ghcr.io/kicad/kicad:9.0@sha256:97cedd027d7dc7e8d5fc804932f838bd208f2ca024ee8d01001c4d52ac8e666a
-      options: --user root
     steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          persist-credentials: false
-      - name: Setup KiCad
-        # https://gitlab.com/kicad/packaging/kicad-cli-docker/-/blob/8c967a567a56fb463d3a062a8a87d8537cf6d1f9/Dockerfile.8.0-stable#L162-165
-        run: |
-          kicad_version=$(kicad-cli -v | cut -d . -f 1,2)
-          mkdir -p ~/.config/kicad/"$kicad_version"
-          cp /usr/share/kicad/template/*-lib-table ~/.config/kicad/"$kicad_version"
       - name: Run Schematic ERC
-        run: >-
-          kicad-cli sch erc
-          --exit-code-violations
-          --format json
-          --output erc.json
-          hardware/gnss-7-seg-clock.kicad_sch
+        uses: docker/bake-action@v6.8.0
+        with:
+          targets: erc
       - name: Export Schematic PDF
-        run: >-
-          kicad-cli sch export pdf
-          --output schematic.pdf
-          hardware/gnss-7-seg-clock.kicad_sch
+        uses: docker/bake-action@v6.8.0
+        with:
+          targets: pdf
       - name: Run PCB DRC
-        run: >-
-          kicad-cli pcb drc
-          --exit-code-violations
-          --format json
-          --output drc.json
-          hardware/gnss-7-seg-clock.kicad_pcb
+        uses: docker/bake-action@v6.8.0
+        with:
+          targets: drc
+
       - uses: actions/upload-artifact@v4.6.2
+        continue-on-error: true
         with:
           name: kicad-outputs
           path: |
-            *.json
-            *.pdf
+            out/*
+
+      - name: Validate
+        run: |
+          {
+            echo '### ERC'
+            echo '```json'
+            cat out/erc.json
+            echo '```'
+            echo '### DRC'
+            echo '```json'
+            cat out/drc.json
+            echo '```';
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          jq --exit-status '.sheets | map(.violations) | flatten(1) | length == 0' out/erc.json
+          jq --exit-status '.violations | length == 0' out/drc.json
