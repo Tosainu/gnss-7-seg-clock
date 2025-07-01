@@ -100,7 +100,7 @@ version = "1.0.219"
 default-features = false
 
 [workspace.dependencies.static_cell]
-version = "2.1.0"
+version = "2.1.1"
 
 [patch.crates-io.embassy-futures]
 git = "https://github.com/embassy-rs/embassy.git"
