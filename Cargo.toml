@@ -86,7 +86,7 @@ features = ["print-defmt"]
 
 # NOTE: needs to be added explicitly when using static_cell
 [workspace.dependencies.portable-atomic]
-version = "1.11.0"
+version = "1.11.1"
 default-features = false
 features = ["critical-section"]
 
