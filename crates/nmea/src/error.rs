@@ -16,8 +16,7 @@ impl fmt::Display for Error<'_> {
         match self {
             Error::ChecksumMismatch { expected, actual } => write!(
                 f,
-                "checksum mismatch, expected: {}, actual: {}",
-                expected, actual
+                "checksum mismatch, expected: {expected}, actual: {actual}"
             ),
             Error::InvalidFrame => write!(f, "not an NMEA message"),
             Error::ParseError(e) => e.fmt(f),
