@@ -97,7 +97,7 @@ Please do not take a close look at 43-44 pins of RP2040! (ignorable solder bridg
 
 Unfortunately, LSD150BAG-101 is not a drop-in replacement for SA15-11GWA. They have a different pitch for the vertical direction: 40.64mm (SA15-11GWA) and 40.00mm (LSD150BAG-101). Since I wanted to have some flexibility in the design, I made the footprint that uses the oval pad so that can use both types of seven-segment LEDs.
 
-![Screenshot_2025-02-01-122517](https://github.com/user-attachments/assets/0b0ae403-fe8b-4c34-ab8e-8e7f0641486e)
+<img width="1309" height="638" alt="footprint-7-seg" src="https://github.com/user-attachments/assets/33ec1fad-94b7-4f99-9496-a21c0c840545" />
 
 The forward voltage also has to be taken into account for `U1-U6`. Vf should be smaller than the USB VBUS. For instance, high-luminance types are not suitable in general.
 
