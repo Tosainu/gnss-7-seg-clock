@@ -12,3 +12,5 @@ _autosave-*
 /hardware/gerber/*
 
 *.pdf
+
+/out
