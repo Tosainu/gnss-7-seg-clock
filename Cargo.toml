@@ -96,7 +96,7 @@ default-features = false
 features = ["use-defmt"]
 
 [workspace.dependencies.serde]
-version = "1.0.219"
+version = "1.0.228"
 default-features = false
 
 [workspace.dependencies.static_cell]
