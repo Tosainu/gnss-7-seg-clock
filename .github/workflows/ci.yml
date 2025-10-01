@@ -60,7 +60,7 @@ jobs:
       - uses: actions/download-artifact@v5.0.0
         with:
           name: firmware
-      - uses: softprops/action-gh-release@fbadcc90e88ecface60a0a0d123795b784ceb239
+      - uses: softprops/action-gh-release@97d42c1b50f585f357413698aa1b779307aa0d52
         with:
           draft: true
           files: |
