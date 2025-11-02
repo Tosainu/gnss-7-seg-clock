@@ -46,7 +46,7 @@ version = "0.1.2"
 features = ["defmt"]
 
 [workspace.dependencies.embassy-rp]
-version = "0.3.0"
+version = "0.8.0"
 features = [
   "boot2-w25q080",
   "critical-section-impl",
