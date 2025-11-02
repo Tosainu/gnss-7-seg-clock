@@ -57,7 +57,7 @@ features = [
 ]
 
 [workspace.dependencies.embassy-sync]
-version = "0.6.2"
+version = "0.7.2"
 features = ["defmt"]
 
 [workspace.dependencies.embassy-time]
