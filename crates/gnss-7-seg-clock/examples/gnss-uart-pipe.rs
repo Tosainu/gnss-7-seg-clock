@@ -36,9 +36,9 @@ async fn main(spawner: Spawner) {
         static UART1_BUF_RX: StaticCell<[u8; 64]> = StaticCell::new();
         uart::BufferedUart::new(
             p.UART1,
-            Irqs,
             p.PIN_20,
             p.PIN_21,
+            Irqs,
             UART1_BUF_TX.init([0; 64]).as_mut_slice(),
             UART1_BUF_RX.init([0; 64]).as_mut_slice(),
             uart1_config,
@@ -97,7 +97,7 @@ async fn usb(mut usb: embassy_usb::UsbDevice<'static, usb::Driver<'static, USB>>
 
 #[embassy_executor::task]
 async fn uart1_to_usb(
-    mut uart1: uart::BufferedUartRx<'static, UART1>,
+    mut uart1: uart::BufferedUartRx,
     mut usb: cdc_acm::Sender<'static, usb::Driver<'static, USB>>,
 ) {
     loop {
@@ -122,7 +122,7 @@ async fn uart1_to_usb(
 #[embassy_executor::task]
 async fn usb_to_uart1(
     mut usb: cdc_acm::Receiver<'static, usb::Driver<'static, USB>>,
-    mut uart1: uart::BufferedUartTx<'static, UART1>,
+    mut uart1: uart::BufferedUartTx,
 ) {
     loop {
         usb.wait_connection().await;

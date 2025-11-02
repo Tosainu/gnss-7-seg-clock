@@ -134,11 +134,11 @@ async fn main(spawner: Spawner) {
     let sw5 = gpio::Input::new(p.PIN_7, gpio::Pull::None);
 
     let mut leds = [
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_1), gpio::Level::Low),
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_2), gpio::Level::Low),
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_3), gpio::Level::Low),
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_4), gpio::Level::Low),
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_5), gpio::Level::Low),
+        gpio::Output::new(p.PIN_1, gpio::Level::Low),
+        gpio::Output::new(p.PIN_2, gpio::Level::Low),
+        gpio::Output::new(p.PIN_3, gpio::Level::Low),
+        gpio::Output::new(p.PIN_4, gpio::Level::Low),
+        gpio::Output::new(p.PIN_5, gpio::Level::Low),
     ];
 
     let _spi1_rx = gpio::Input::new(p.PIN_12, gpio::Pull::Down);
@@ -329,6 +329,6 @@ async fn handle_mode_config_time_zone<R: RawMutex, Spi: spi::Instance, const N: 
 }
 
 #[embassy_executor::task]
-async fn task_max_m10s(mut max_m10s: MaxM10s<'static, UART1, I2C1>, channel: &'static NmeaChannel) {
+async fn task_max_m10s(mut max_m10s: MaxM10s<'static, I2C1>, channel: &'static NmeaChannel) {
     max_m10s.run(channel.sender()).await;
 }

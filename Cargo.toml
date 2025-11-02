@@ -32,13 +32,12 @@ version = "1.0.1"
 version = "0.4.2"
 
 [workspace.dependencies.embassy-executor]
-version = "0.7.0"
+version = "0.9.1"
 features = [
   "arch-cortex-m",
   "defmt",
   "executor-interrupt",
   "executor-thread",
-  "task-arena-size-98304",
 ]
 
 [workspace.dependencies.embassy-futures]
@@ -46,7 +45,7 @@ version = "0.1.2"
 features = ["defmt"]
 
 [workspace.dependencies.embassy-rp]
-version = "0.3.0"
+version = "0.8.0"
 features = [
   "boot2-w25q080",
   "critical-section-impl",
@@ -68,7 +67,7 @@ features = [
 ]
 
 [workspace.dependencies.embassy-usb]
-version = "0.4.0"
+version = "0.5.1"
 default-features = false
 features = ["defmt"]
 

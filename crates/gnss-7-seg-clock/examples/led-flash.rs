@@ -11,11 +11,11 @@ use {defmt_rtt as _, panic_probe as _};
 async fn main(_spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
     let mut leds = [
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_1), gpio::Level::Low),
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_2), gpio::Level::Low),
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_3), gpio::Level::Low),
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_4), gpio::Level::Low),
-        gpio::Output::new(gpio::AnyPin::from(p.PIN_5), gpio::Level::Low),
+        gpio::Output::new(p.PIN_1, gpio::Level::Low),
+        gpio::Output::new(p.PIN_2, gpio::Level::Low),
+        gpio::Output::new(p.PIN_3, gpio::Level::Low),
+        gpio::Output::new(p.PIN_4, gpio::Level::Low),
+        gpio::Output::new(p.PIN_5, gpio::Level::Low),
     ];
 
     let pattern = [

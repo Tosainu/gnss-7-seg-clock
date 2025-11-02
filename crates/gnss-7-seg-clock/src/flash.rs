@@ -1,4 +1,4 @@
-use embassy_rp::Peripheral;
+use embassy_rp::Peri;
 use embassy_rp::flash::{self, Blocking, ERASE_SIZE, Flash, Instance};
 
 #[derive(defmt::Format, Debug)]
@@ -24,7 +24,7 @@ where
     T: Instance,
     C: Default + serde::Serialize + serde::de::DeserializeOwned,
 {
-    pub fn new(flash: impl Peripheral<P = T> + 'd) -> Self {
+    pub fn new(flash: Peri<'d, T>) -> Self {
         Self {
             buf: [0; N],
             flash: Flash::<_, Blocking, FLASH_SIZE>::new_blocking(flash),

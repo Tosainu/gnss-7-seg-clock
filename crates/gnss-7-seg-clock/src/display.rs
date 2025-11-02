@@ -1,4 +1,4 @@
-use embassy_rp::{Peripheral, dma, gpio, spi};
+use embassy_rp::{Peri, dma, gpio, spi};
 use embassy_time::Timer;
 
 pub struct Payload(pub [u8; 6]);
@@ -17,12 +17,12 @@ where
     Spi: spi::Instance,
 {
     pub fn new(
-        spi: impl Peripheral<P = Spi> + 'd,
-        spi_clk: impl Peripheral<P = impl spi::ClkPin<Spi>> + 'd,
-        spi_tx: impl Peripheral<P = impl spi::MosiPin<Spi>> + 'd,
-        spi_tx_dma: impl Peripheral<P = impl dma::Channel> + 'd,
-        gpio_noe: impl Peripheral<P = impl gpio::Pin> + 'd,
-        gpio_le: impl Peripheral<P = impl gpio::Pin> + 'd,
+        spi: Peri<'d, Spi>,
+        spi_clk: Peri<'d, impl spi::ClkPin<Spi>>,
+        spi_tx: Peri<'d, impl spi::MosiPin<Spi>>,
+        spi_tx_dma: Peri<'d, impl dma::Channel>,
+        gpio_noe: Peri<'d, impl gpio::Pin>,
+        gpio_le: Peri<'d, impl gpio::Pin>,
     ) -> Self {
         let spi_config = {
             let mut c = spi::Config::default();
