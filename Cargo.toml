@@ -81,7 +81,7 @@ version = "8.0.0"
 default-features = false
 
 [workspace.dependencies.panic-probe]
-version = "0.3.2"
+version = "1.0.0"
 features = ["print-defmt"]
 
 # NOTE: needs to be added explicitly when using static_cell
