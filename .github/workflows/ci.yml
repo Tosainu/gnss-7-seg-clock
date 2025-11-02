@@ -30,7 +30,7 @@ jobs:
       - run: "cargo test-libs --target \"$(rustc -vV | sed -n 's|host: ||p')\""
       - run: cargo build --release --bins --examples
       - run: picotool uf2 convert target/thumbv6m-none-eabi/release/gnss-7-seg-clock -t elf target/thumbv6m-none-eabi/release/gnss-7-seg-clock.uf2
-      - uses: actions/upload-artifact@v4.6.2
+      - uses: actions/upload-artifact@v5.0.0
         with:
           name: firmware
           path: |
@@ -83,7 +83,7 @@ jobs:
         with:
           targets: drc
 
-      - uses: actions/upload-artifact@v4.6.2
+      - uses: actions/upload-artifact@v5.0.0
         continue-on-error: true
         with:
           name: kicad-outputs
