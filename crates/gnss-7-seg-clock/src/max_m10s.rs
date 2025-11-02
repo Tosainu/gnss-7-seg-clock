@@ -1,5 +1,5 @@
 use embassy_futures::select::*;
-use embassy_rp::{Peripheral, gpio, i2c, interrupt::typelevel::Binding, uart};
+use embassy_rp::{Peri, gpio, i2c, interrupt::typelevel::Binding, uart};
 use embassy_sync::{blocking_mutex::raw::RawMutex, channel::Sender};
 use embassy_time::{Duration, Instant, Timer};
 use embedded_io_async::Read;
@@ -25,12 +25,11 @@ pub fn ubx_fill_ck(buf: &mut [u8]) {
 
 const MAX_M10S_I2C_ADDRESS: u16 = 0x42;
 
-pub struct MaxM10s<'d, Uart, I2c>
+pub struct MaxM10s<'d, I2c>
 where
-    Uart: uart::Instance,
     I2c: i2c::Instance,
 {
-    uart: uart::BufferedUartRx<'d, Uart>,
+    uart: uart::BufferedUartRx,
     i2c: i2c::I2c<'d, I2c, i2c::Async>,
     gpio_nreset: gpio::Output<'d>,
     gpio_extint: gpio::Input<'d>,
@@ -47,21 +46,20 @@ pub enum Event {
     DateTime(NaiveDateTime),
 }
 
-impl<'d, Uart, I2c> MaxM10s<'d, Uart, I2c>
+impl<'d, I2c> MaxM10s<'d, I2c>
 where
-    Uart: uart::Instance,
     I2c: i2c::Instance,
 {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        uart: impl Peripheral<P = Uart> + 'd,
-        uart_rx: impl Peripheral<P = impl uart::RxPin<Uart>> + 'd,
+    pub fn new<Uart: uart::Instance>(
+        uart: Peri<'d, Uart>,
+        uart_rx: Peri<'d, impl uart::RxPin<Uart>>,
         uart_rx_buffer: &'d mut [u8],
-        i2c: impl Peripheral<P = I2c> + 'd,
-        i2c_scl: impl Peripheral<P = impl i2c::SclPin<I2c>> + 'd,
-        i2c_sda: impl Peripheral<P = impl i2c::SdaPin<I2c>> + 'd,
-        gpio_nreset: impl Peripheral<P = impl gpio::Pin> + 'd,
-        gpio_extint: impl Peripheral<P = impl gpio::Pin> + 'd,
+        i2c: Peri<'d, I2c>,
+        i2c_scl: Peri<'d, impl i2c::SclPin<I2c>>,
+        i2c_sda: Peri<'d, impl i2c::SdaPin<I2c>>,
+        gpio_nreset: Peri<'d, impl gpio::Pin>,
+        gpio_extint: Peri<'d, impl gpio::Pin>,
         irq: impl Binding<Uart::Interrupt, uart::BufferedInterruptHandler<Uart>>
         + Binding<I2c::Interrupt, i2c::InterruptHandler<I2c>>
         + Copy,
