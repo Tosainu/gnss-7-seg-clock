@@ -71,15 +71,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Run Schematic ERC
-        uses: docker/bake-action@v6.9.0
+        uses: docker/bake-action@v6.10.0
         with:
           targets: erc
       - name: Export Schematic PDF
-        uses: docker/bake-action@v6.9.0
+        uses: docker/bake-action@v6.10.0
         with:
           targets: pdf
       - name: Run PCB DRC
-        uses: docker/bake-action@v6.9.0
+        uses: docker/bake-action@v6.10.0
         with:
           targets: drc
 
