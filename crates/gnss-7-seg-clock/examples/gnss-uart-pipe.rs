@@ -111,7 +111,7 @@ async fn uart1_to_usb(
             if usb.write_packet(&buf[..n]).await.is_err() {
                 break;
             }
-            if n == 64 && usb.write_packet(&buf[..0]).await.is_err() {
+            if n == 64 && usb.write_packet(&[]).await.is_err() {
                 break;
             }
         }

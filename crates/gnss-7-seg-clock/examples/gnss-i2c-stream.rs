@@ -176,7 +176,7 @@ async fn main(spawner: Spawner) {
             continue;
         }
 
-        for chunk in buf.chunks(64) {
+        for chunk in buf[..len].chunks(64) {
             defmt::unwrap!(usb_cdc_acm.write_packet(chunk).await);
         }
 
