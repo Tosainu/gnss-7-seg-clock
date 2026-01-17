@@ -12,6 +12,8 @@ use static_cell::StaticCell;
 
 use {defmt_rtt as _, panic_probe as _};
 
+use gnss_7_seg_clock::display::{self, Display};
+
 use ubx::{UbxFrame, UbxStream};
 
 embassy_rp::bind_interrupts!(struct Irqs {
@@ -19,13 +21,61 @@ embassy_rp::bind_interrupts!(struct Irqs {
     UART1_IRQ => uart::BufferedInterruptHandler<UART1>;
 });
 
+//
+//     +- A -+
+//     F     B
+//     +- G -+
+//     E     C
+//     +- D -+
+//
+//    GFpABEDC
+const TABLE: [u8; 10] = [
+    0b01011111_u8, // '0'
+    0b00001001_u8, // '1'
+    0b10011110_u8, // '2'
+    0b10011011_u8, // '3'
+    0b11001001_u8, // '4'
+    0b11010011_u8, // '5'
+    0b11010111_u8, // '6'
+    0b00011001_u8, // '7'
+    0b11011111_u8, // '8'
+    0b11011011_u8, // '9'
+];
+
+const MASK_DP: u8 = 0b00100000;
+
+fn u32_to_display_payload(value: u32) -> display::Payload {
+    let mut arr = [
+        TABLE[value as usize % 10],
+        TABLE[value as usize / 10 % 10],
+        TABLE[value as usize / 100 % 10],
+        TABLE[value as usize / 1000 % 10],
+        TABLE[value as usize / 10000 % 10],
+        TABLE[value as usize / 100000 % 10],
+    ];
+    arr[3] |= MASK_DP;
+    if value < 100_000 {
+        arr[5] = 0;
+    }
+    if value < 10_000 {
+        arr[4] = 0;
+    }
+    display::Payload(arr)
+}
+
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
 
     let mut gnss_nreset = gpio::Output::new(p.PIN_16, gpio::Level::Low);
 
-    let mut i2c = i2c::I2c::new_async(p.I2C1, p.PIN_23, p.PIN_22, Irqs, i2c::Config::default());
+    let mut leds = [
+        gpio::Output::new(p.PIN_5, gpio::Level::Low),
+        gpio::Output::new(p.PIN_4, gpio::Level::Low),
+        gpio::Output::new(p.PIN_3, gpio::Level::Low),
+        gpio::Output::new(p.PIN_2, gpio::Level::Low),
+        gpio::Output::new(p.PIN_1, gpio::Level::Low),
+    ];
 
     let uart_config = {
         let mut c = uart::Config::default();
@@ -47,7 +97,15 @@ async fn main(_spawner: Spawner) {
             uart_config,
         )
     };
-    uart.set_baudrate(115200);
+
+    let mut i2c = i2c::I2c::new_async(p.I2C1, p.PIN_23, p.PIN_22, Irqs, i2c::Config::default());
+
+    let _spi1_rx = gpio::Input::new(p.PIN_12, gpio::Pull::Down);
+    let mut display = Display::new(p.SPI1, p.PIN_14, p.PIN_15, p.DMA_CH0, p.PIN_11, p.PIN_13);
+
+    display.shift(&u32_to_display_payload(0)).await;
+    display.refresh().await;
+    display.output(true);
 
     gnss_nreset.set_low();
     Timer::after_millis(500).await;
@@ -128,6 +186,9 @@ async fn main(_spawner: Spawner) {
                         u32::from_le_bytes([payload[20], payload[21], payload[22], payload[23]]);
 
                     defmt::info!("UBX-NAV-VELNED: {} ms, {} cm/s", itow, gspeed);
+
+                    display.shift(&u32_to_display_payload(gspeed)).await;
+                    display.refresh().await;
                 }
 
                 // UBX-NAV-STATUS
@@ -145,6 +206,10 @@ async fn main(_spawner: Spawner) {
                     let gps_fix = payload[4];
 
                     defmt::info!("UBX-NAV-STATUS: {} ms, fix = {:#04x}", itow, gps_fix);
+
+                    leds[0].set_level(((gps_fix & 0b001) != 0).into());
+                    leds[1].set_level(((gps_fix & 0b010) != 0).into());
+                    leds[2].set_level(((gps_fix & 0b100) != 0).into());
                 }
 
                 _ => (),
