@@ -104,22 +104,48 @@ async fn main(_spawner: Spawner) {
         }
 
         while let Some(frame) = buf.pop() {
-            defmt::debug!("class = {:02x}, id = {:02x}", frame.class, frame.id,);
+            defmt::debug!(
+                "class = {:02x}, id = {:02x}, payload = {:02x}",
+                frame.class,
+                frame.id,
+                frame.payload
+            );
 
             match frame {
-                // UBX-ACK-ACK for UBX-CFG-VALSET
+                // UBX-NAV-VELNED
                 UbxFrame {
-                    class: 0x05,
-                    id: 0x01,
-                    payload: &[0x06, 0x8a],
-                } => defmt::info!("UBX-CFG-VALSET ack"),
+                    class: 0x01,
+                    id: 0x12,
+                    payload,
+                } => {
+                    if payload.len() != 36 {
+                        defmt::warn!("got UBX-NAV-VELNED but wrong size: {}", payload.len());
+                        continue;
+                    }
 
-                // UBX-ACK-NAK for UBX-CFG-VALSET
+                    let itow = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                    let gspeed =
+                        u32::from_le_bytes([payload[20], payload[21], payload[22], payload[23]]);
+
+                    defmt::info!("UBX-NAV-VELNED: {} ms, {} cm/s", itow, gspeed);
+                }
+
+                // UBX-NAV-STATUS
                 UbxFrame {
-                    class: 0x05,
-                    id: 0x00,
-                    payload: &[0x06, 0x8a],
-                } => defmt::info!("UBX-CFG-VALSET nak"),
+                    class: 0x01,
+                    id: 0x03,
+                    payload,
+                } => {
+                    if payload.len() != 16 {
+                        defmt::warn!("got UBX-NAV-STATUS but wrong size: {}", payload.len());
+                        continue;
+                    }
+
+                    let itow = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                    let gps_fix = payload[4];
+
+                    defmt::info!("UBX-NAV-STATUS: {} ms, fix = {:#04x}", itow, gps_fix);
+                }
 
                 _ => (),
             }
