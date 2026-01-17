@@ -679,6 +679,7 @@ dependencies = [
  "postcard",
  "serde",
  "static_cell",
+ "ubx",
 ]
 
 [[package]]

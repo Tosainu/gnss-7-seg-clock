@@ -12,6 +12,9 @@ workspace = true
 features = ["defmt"]
 workspace = true
 
+[dependencies.ubx]
+workspace = true
+
 [dependencies.chrono]
 workspace = true
 
