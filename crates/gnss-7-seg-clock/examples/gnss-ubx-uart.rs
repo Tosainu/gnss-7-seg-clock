@@ -182,12 +182,20 @@ async fn main(_spawner: Spawner) {
                     }
 
                     let itow = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-                    let gspeed =
+                    let gspeed_cm_s =
                         u32::from_le_bytes([payload[20], payload[21], payload[22], payload[23]]);
 
-                    defmt::info!("UBX-NAV-VELNED: {} ms, {} cm/s", itow, gspeed);
+                    let gspeed_m_h = gspeed_cm_s * 60 * 60 / 100;
 
-                    display.shift(&u32_to_display_payload(gspeed)).await;
+                    defmt::info!(
+                        "UBX-NAV-VELNED: {} ms, {} cm/s, {}.{:03} km/h",
+                        itow,
+                        gspeed_cm_s,
+                        gspeed_m_h / 1000,
+                        gspeed_m_h % 1000,
+                    );
+
+                    display.shift(&u32_to_display_payload(gspeed_m_h)).await;
                     display.refresh().await;
                 }
 
@@ -204,12 +212,21 @@ async fn main(_spawner: Spawner) {
 
                     let itow = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
                     let gps_fix = payload[4];
+                    let flags = payload[4];
 
-                    defmt::info!("UBX-NAV-STATUS: {} ms, fix = {:#04x}", itow, gps_fix);
+                    defmt::info!(
+                        "UBX-NAV-STATUS: {} ms, fix = {:#04x}, flags = {:#04x}",
+                        itow,
+                        gps_fix,
+                        flags
+                    );
 
                     leds[0].set_level(((gps_fix & 0b001) != 0).into());
                     leds[1].set_level(((gps_fix & 0b010) != 0).into());
                     leds[2].set_level(((gps_fix & 0b100) != 0).into());
+
+                    leds[3].set_level(((flags & 0b01) != 0).into());
+                    leds[4].set_level(((flags & 0b10) != 0).into());
                 }
 
                 _ => (),
