@@ -71,11 +71,17 @@ impl<const N: usize> UbxStream<N> {
         self.begin = self.end.min(self.begin + n);
     }
 
-    pub fn pop<'a>(&'a mut self) -> Option<UbxFrame<'a>> {
+    pub fn pop(&mut self) -> Option<UbxFrame<'_>> {
+        if self.end == N {
+            self.buf.copy_within(self.begin..self.end, 0);
+            self.end -= self.begin;
+            self.begin = 0;
+        }
+
         for i in self.begin..self.end {
             match self.buf[i..self.end] {
                 [UBX_PREAMBLE1, UBX_PREAMBLE2, ..] => (),
-                [] | [UBX_PREAMBLE1] => return None,
+                [] | [UBX_PREAMBLE1] => break,
                 _ => {
                     self.begin = i + 1; //discard this byte
                     continue;
@@ -84,7 +90,7 @@ impl<const N: usize> UbxStream<N> {
 
             let frame = &self.buf[i..self.end];
             if frame.len() < UBX_FRAME_METATATA_SIZE {
-                return None;
+                break;
             }
 
             let payload_size = u16::from_le_bytes([
@@ -92,7 +98,7 @@ impl<const N: usize> UbxStream<N> {
                 frame[UBX_FRAME_LENGTH_OFFSET + 1],
             ]) as usize;
             if frame.len() < UBX_FRAME_METATATA_SIZE + payload_size {
-                return None;
+                break;
             }
 
             let frame = &frame[..UBX_FRAME_METATATA_SIZE + payload_size];
@@ -106,17 +112,12 @@ impl<const N: usize> UbxStream<N> {
             let (ck_a, ck_b) =
                 checksum(&frame[UBX_FRAME_CLASS_OFFSET..UBX_FRAME_PAYLOAD_OFFSET + payload_size]);
             if frame[frame.len() - 2] != ck_a || frame[frame.len() - 1] != ck_b {
-                return None;
+                break;
             }
 
             return Some(UbxFrame { class, id, payload });
         }
 
-        if self.end == N {
-            self.buf.copy_within(self.begin..self.end, 0);
-            self.end -= self.begin;
-            self.begin = 0;
-        }
         None
     }
 
@@ -216,7 +217,7 @@ mod tests {
             })
         );
         assert_eq!(buf.buf_filled(), UBX_FRAME1);
-        assert_eq!(buf.buf_unused_mut().len(), 0);
+        assert_eq!(buf.buf_unused_mut().len(), 10);
 
         assert_eq!(
             buf.pop(),
@@ -227,11 +228,11 @@ mod tests {
             })
         );
         assert_eq!(buf.buf_filled(), &[]);
-        assert_eq!(buf.buf_unused_mut().len(), 0);
+        assert_eq!(buf.buf_unused_mut().len(), 10);
 
         assert_eq!(buf.pop(), None);
         assert_eq!(buf.buf_filled(), &[]);
-        assert_eq!(buf.buf_unused_mut().len(), 32);
+        assert_eq!(buf.buf_unused_mut().len(), 10);
     }
 
     #[test]
@@ -338,5 +339,41 @@ mod tests {
 
         assert_eq!(buf.buf_filled(), &[]);
         assert_eq!(buf.buf_unused_mut().len(), 8);
+    }
+
+    #[test]
+    fn test_avoid_no_room() {
+        let mut buf = UbxStream::<16>::new();
+
+        buf.buf_unused_mut()[..UBX_FRAME2.len()].copy_from_slice(&UBX_FRAME2);
+        buf.commit(UBX_FRAME2.len());
+
+        assert_eq!(buf.buf_filled(), UBX_FRAME2);
+        assert_eq!(buf.buf_unused_mut().len(), 4);
+
+        buf.buf_unused_mut()[..4].copy_from_slice(&UBX_FRAME1[..4]);
+        buf.commit(4);
+
+        assert_eq!(buf.buf_filled()[..UBX_FRAME2.len()], UBX_FRAME2);
+        assert_eq!(
+            &buf.buf_filled()[UBX_FRAME2.len()..UBX_FRAME2.len() + 4],
+            &UBX_FRAME1[..4]
+        );
+        assert_eq!(buf.buf_unused_mut().len(), 0);
+
+        assert_eq!(
+            buf.pop(),
+            Some(UbxFrame {
+                class: 0xab,
+                id: 0xcd,
+                payload: &[0xde, 0xad, 0xbe, 0xef],
+            })
+        );
+        assert_eq!(buf.buf_filled(), &UBX_FRAME1[..4]);
+        assert_eq!(buf.buf_unused_mut().len(), 0);
+
+        assert_eq!(buf.pop(), None);
+        assert_eq!(buf.buf_filled(), &UBX_FRAME1[..4]);
+        assert_ne!(buf.buf_unused_mut().len(), 0);
     }
 }
