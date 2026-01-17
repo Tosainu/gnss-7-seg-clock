@@ -4,26 +4,15 @@ use embassy_sync::{blocking_mutex::raw::RawMutex, channel::Sender};
 use embassy_time::{Duration, Instant, Timer};
 use embedded_io_async::Read;
 
-use chrono::NaiveDateTime;
+use chrono::{Datelike, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Timelike};
 
-use misc::crlf_stream::CrlfStream;
-
-pub fn ubx_fill_ck(buf: &mut [u8]) {
-    if buf.len() < 4 {
-        return;
-    }
-
-    let mut ck_a = 0_u8;
-    let mut ck_b = 0_u8;
-    for c in &buf[2..buf.len() - 2] {
-        ck_a = ck_a.overflowing_add(*c).0;
-        ck_b = ck_b.overflowing_add(ck_a).0;
-    }
-    buf[buf.len() - 2] = ck_a;
-    buf[buf.len() - 1] = ck_b;
-}
+use ubx::{UbxFrame, UbxStream};
 
 const MAX_M10S_I2C_ADDRESS: u16 = 0x42;
+
+const GPS_EPOCH: NaiveDateTime = NaiveDate::from_ymd_opt(1980, 1, 6)
+    .unwrap()
+    .and_time(NaiveTime::MIN);
 
 pub struct MaxM10s<'d, I2c>
 where
@@ -43,7 +32,11 @@ enum State {
 }
 
 pub enum Event {
-    DateTime(NaiveDateTime),
+    DateTimeAndVelocity {
+        datetime: NaiveDateTime,
+        ground_speed_meter_hour: u32,
+    },
+    DateTimeNextPulse(NaiveDateTime),
 }
 
 impl<'d, I2c> MaxM10s<'d, I2c>
@@ -86,7 +79,7 @@ where
             let next_state = match state {
                 State::PowerCycle => self.do_power_cycle().await,
                 State::Setup => self.do_setup().await,
-                State::Ready => self.do_reveive_nmea(&sender).await,
+                State::Ready => self.do_receive_ubx(&sender).await,
             };
             if next_state != state {
                 defmt::info!("MAX-M10S: {} -> {}", state, next_state);
@@ -117,14 +110,17 @@ where
                 0x03, 0x00, 0xa2, 0x20, 0x05, // CFG-TXREADY-PIN (=5=EXTINT)
                 0x04, 0x00, 0xa2, 0x30, 0x01, 0x00, // CFG-TXREADY-THRESHOLD (=8/8)
                 0x05, 0x00, 0xa2, 0x20, 0x00, // CFG-TXREADY-INTERFACE (=0=I2C)
+                0x01, 0x00, 0x21, 0x30, 0xc8, 0x00, // CFG-RATE-MEAS (=200 ms/5 Hz)
+                0x07, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_NAV_PVT_UART1 (=1)
+                0x7e, 0x01, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_TIM_TP_UART1 (=1)
                 0x01, 0x00, 0x71, 0x10, 0x01, // CFG-I2CINPROT-UBX (=1)
                 0x02, 0x00, 0x71, 0x10, 0x00, // CFG-I2CINPROT-NMEA (=0)
                 0x01, 0x00, 0x72, 0x10, 0x01, // CFG-I2COUTPROT-UBX (=1)
                 0x02, 0x00, 0x72, 0x10, 0x00, // CFG-I2COUTPROT-NMEA (=0)
                 0x01, 0x00, 0x73, 0x10, 0x00, // CFG-UART1INPROT-UBX (=0)
-                0x02, 0x00, 0x73, 0x10, 0x01, // CFG-UART1INPROT-NMEA (=1)
-                0x01, 0x00, 0x74, 0x10, 0x00, // CFG-UART1OUTPROT-UBX (=0)
-                0x02, 0x00, 0x74, 0x10, 0x01, // CFG-UART1OUTPROT-NMEA (=1)
+                0x02, 0x00, 0x73, 0x10, 0x00, // CFG-UART1INPROT-NMEA (=0)
+                0x01, 0x00, 0x74, 0x10, 0x01, // CFG-UART1OUTPROT-UBX (=1)
+                0x02, 0x00, 0x74, 0x10, 0x00, // CFG-UART1OUTPROT-NMEA (=0)
                 // CFG-UART1-BAUDRATE (=115200)
                 0x01, 0x00, 0x52, 0x40, 0x00, 0xc2, 0x01, 0x00,
                 // payload end
@@ -133,22 +129,8 @@ where
             ];
             let len = frame.len() as u16 - 8;
             frame[4..6].copy_from_slice(&len.to_le_bytes());
-            ubx_fill_ck(&mut frame);
-            frame
-        };
-
-        let ubx_ack_ack_frame = {
-            let mut frame = [
-                0xb5, 0x62, // header
-                0x05, 0x01, // id/class (=UBX-ACK-ACK)
-                0x02, 0x00, // length
-                // payload begin
-                0x06, 0x8a, // id/class (=UBX-CFG-VALSET)
-                // payload end
-                0x00, // ck_a
-                0x00, // ck_b
-            ];
-            ubx_fill_ck(&mut frame);
+            (frame[frame.len() - 2], frame[frame.len() - 1]) =
+                ubx::checksum(&frame[2..frame.len() - 2]);
             frame
         };
 
@@ -166,49 +148,59 @@ where
             Timer::after_millis(100).await;
         }
 
-        if let Either::Second(..) =
-            select(self.gpio_extint.wait_for_low(), Timer::after_secs(1)).await
-        {
-            defmt::warn!("EXTINT pin (TX_READY) is not being asserted");
-            return State::PowerCycle;
-        }
+        let mut buf = UbxStream::<512>::new();
+        'outer: loop {
+            if let Either::Second(..) =
+                select(self.gpio_extint.wait_for_low(), Timer::after_secs(1)).await
+            {
+                defmt::warn!("EXTINT pin (TX_READY) is not being asserted");
+                return State::PowerCycle;
+            }
 
-        let mut len = [0; 2];
-        if let Err(e) = self
-            .i2c
-            .write_read_async(MAX_M10S_I2C_ADDRESS, [0xfd_u8], &mut len)
-            .await
-        {
-            defmt::warn!("I2C operation failed ({})", e);
-            return State::PowerCycle;
-        }
+            let mut len = [0; 2];
+            if let Err(e) = self
+                .i2c
+                .write_read_async(MAX_M10S_I2C_ADDRESS, [0xfd_u8], &mut len)
+                .await
+            {
+                defmt::warn!("I2C operation failed ({})", e);
+                return State::PowerCycle;
+            }
 
-        let len = u16::from_be_bytes(len);
-        defmt::debug!("len = {}", len);
-        if len < 10 {
-            defmt::warn!("unexpected data size ({})", len);
-            return State::PowerCycle;
-        }
+            let len = u16::from_be_bytes(len) as usize;
+            defmt::debug!("len = {}", len);
 
-        let mut buf = [0; 10];
-        if let Err(e) = self.i2c.read_async(MAX_M10S_I2C_ADDRESS, &mut buf).await {
-            defmt::warn!("I2C operation failed ({})", e);
-            return State::PowerCycle;
-        }
+            if let Err(e) = self
+                .i2c
+                .read_async(MAX_M10S_I2C_ADDRESS, &mut buf.buf_unused_mut()[..len])
+                .await
+            {
+                defmt::warn!("I2C operation failed ({})", e);
+                return State::PowerCycle;
+            }
 
-        if buf != ubx_ack_ack_frame {
-            defmt::warn!("unexpected data ({}/{})", buf, ubx_ack_ack_frame);
-            return State::PowerCycle;
+            buf.commit(len);
+
+            while let Some(frame) = buf.pop() {
+                if let UbxFrame {
+                    class: 0x05, // (=UBX-ACK-ACK)
+                    id: 0x01,
+                    payload: &[0x06, 0x8a], // (=UBX-CFG-VALSET)
+                } = frame
+                {
+                    break 'outer;
+                }
+            }
         }
 
         State::Ready
     }
 
-    async fn do_reveive_nmea<M: RawMutex, const N: usize>(
+    async fn do_receive_ubx<M: RawMutex, const N: usize>(
         &mut self,
         sender: &Sender<'_, M, Event, N>,
     ) -> State {
-        let mut buf = CrlfStream::<512>::new();
+        let mut buf = UbxStream::<512>::new();
         let mut errors = 0_u32;
         loop {
             if errors > 10 {
@@ -225,23 +217,128 @@ where
                 }
             }
 
-            while let Some(line) = buf.pop() {
-                defmt::debug!("{:a}", line);
-                match nmea::parser::parse(line) {
-                    Ok(msg) => {
-                        if let nmea::parser::MessageType::Rmc(data) = msg.data {
-                            defmt::info!("{}", data);
-                            if let (Some(date), Some(time)) = (data.date, data.time) {
-                                sender.send(Event::DateTime(date.and_time(time))).await;
-                            }
+            while let Some(frame) = buf.pop() {
+                defmt::debug!(
+                    "class = {:02x}, id = {:02x}, payload = {:02x}",
+                    frame.class,
+                    frame.id,
+                    frame.payload
+                );
+
+                match frame {
+                    // UBX-NAV-PVT
+                    UbxFrame {
+                        class: 0x01,
+                        id: 0x07,
+                        payload,
+                    } => {
+                        if payload.len() != 92 {
+                            defmt::warn!("got UBX-NAV-PVT but wrong size: {}", payload.len());
+                            continue;
+                        }
+
+                        let itow =
+                            u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                        let year = u16::from_le_bytes([payload[4], payload[5]]);
+                        let month = payload[6];
+                        let day = payload[7];
+                        let hour = payload[8];
+                        let min = payload[9];
+                        let sec = payload[10];
+                        let gps_fix = payload[20];
+                        let flags = payload[21];
+                        let gspeed_cm_s = u32::from_le_bytes([
+                            payload[60],
+                            payload[61],
+                            payload[62],
+                            payload[63],
+                        ]);
+
+                        let ground_speed_meter_hour = gspeed_cm_s * 60 * 60 / 100;
+                        if let (Some(date), Some(time)) = (
+                            NaiveDate::from_ymd_opt(year.into(), month.into(), day.into()),
+                            NaiveTime::from_hms_milli_opt(
+                                hour.into(),
+                                min.into(),
+                                sec.into(),
+                                itow % 1000,
+                            ),
+                        ) {
+                            sender
+                                .send(Event::DateTimeAndVelocity {
+                                    datetime: date.and_time(time),
+                                    ground_speed_meter_hour,
+                                })
+                                .await;
+                        }
+
+                        defmt::info!(
+                            "UBX-NAV-PVT: {} ms, {:04}-{:02}-{:02} {:02}:{:02}:{:02}, {} cm/s, {}.{:03} km/h, fix = {:#04x}, flags = {:#04x}",
+                            itow,
+                            year,
+                            month,
+                            day,
+                            hour,
+                            min,
+                            sec,
+                            gspeed_cm_s,
+                            ground_speed_meter_hour / 1000,
+                            ground_speed_meter_hour % 1000,
+                            gps_fix,
+                            flags
+                        );
+                    }
+
+                    // UBX-TIM-TP
+                    UbxFrame {
+                        class: 0x0d,
+                        id: 0x01,
+                        payload,
+                    } => {
+                        if payload.len() != 16 {
+                            defmt::warn!("got UBX-TIM-TP but wrong size: {}", payload.len());
+                            continue;
+                        }
+
+                        let towms =
+                            u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                        let towsubms =
+                            u32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]);
+                        let week = u16::from_le_bytes([payload[12], payload[13]]);
+                        let flags = payload[14];
+
+                        defmt::debug!(
+                            "UBX-TIM-TP: {} ms, {} ms, week = {}, flags = {:#04x}",
+                            towms,
+                            towsubms,
+                            week,
+                            flags,
+                        );
+
+                        if (flags & 0x03) == 0x03 && towsubms == 0 {
+                            let datetime = GPS_EPOCH
+                                + TimeDelta::weeks(week.into())
+                                + TimeDelta::milliseconds(towms.into());
+                            sender.send(Event::DateTimeNextPulse(datetime)).await;
+
+                            defmt::info!(
+                                "UBX-TIM-TP: {:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                                datetime.year(),
+                                datetime.month(),
+                                datetime.day(),
+                                datetime.hour(),
+                                datetime.minute(),
+                                datetime.second()
+                            );
                         }
                     }
-                    Err(err) => defmt::warn!("{:a}: {}", line, err),
+
+                    _ => (),
                 }
             }
 
             if buf.buf_filled().len() == 512 {
-                defmt::warn!("CrlfStream full");
+                defmt::warn!("UbxStream full");
                 buf.consume(512);
             }
         }

@@ -735,12 +735,12 @@ dependencies = [
  "embassy-usb",
  "embedded-io-async 0.7.0",
  "misc",
- "nmea",
  "panic-probe",
  "portable-atomic",
  "postcard",
  "serde",
  "static_cell",
+ "ubx",
 ]
 
 [[package]]

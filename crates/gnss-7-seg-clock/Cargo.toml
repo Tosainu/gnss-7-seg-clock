@@ -8,8 +8,7 @@ default-run = "gnss-7-seg-clock"
 [dependencies.misc]
 workspace = true
 
-[dependencies.nmea]
-features = ["defmt"]
+[dependencies.ubx]
 workspace = true
 
 [dependencies.chrono]
