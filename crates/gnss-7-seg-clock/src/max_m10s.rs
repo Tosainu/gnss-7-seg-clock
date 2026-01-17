@@ -7,21 +7,7 @@ use embedded_io_async::Read;
 use chrono::NaiveDateTime;
 
 use misc::crlf_stream::CrlfStream;
-
-pub fn ubx_fill_ck(buf: &mut [u8]) {
-    if buf.len() < 4 {
-        return;
-    }
-
-    let mut ck_a = 0_u8;
-    let mut ck_b = 0_u8;
-    for c in &buf[2..buf.len() - 2] {
-        ck_a = ck_a.overflowing_add(*c).0;
-        ck_b = ck_b.overflowing_add(ck_a).0;
-    }
-    buf[buf.len() - 2] = ck_a;
-    buf[buf.len() - 1] = ck_b;
-}
+use ubx::{UbxFrame, UbxStream};
 
 const MAX_M10S_I2C_ADDRESS: u16 = 0x42;
 
@@ -133,22 +119,8 @@ where
             ];
             let len = frame.len() as u16 - 8;
             frame[4..6].copy_from_slice(&len.to_le_bytes());
-            ubx_fill_ck(&mut frame);
-            frame
-        };
-
-        let ubx_ack_ack_frame = {
-            let mut frame = [
-                0xb5, 0x62, // header
-                0x05, 0x01, // id/class (=UBX-ACK-ACK)
-                0x02, 0x00, // length
-                // payload begin
-                0x06, 0x8a, // id/class (=UBX-CFG-VALSET)
-                // payload end
-                0x00, // ck_a
-                0x00, // ck_b
-            ];
-            ubx_fill_ck(&mut frame);
+            (frame[frame.len() - 2], frame[frame.len() - 1]) =
+                ubx::checksum(&frame[2..frame.len() - 2]);
             frame
         };
 
@@ -166,39 +138,49 @@ where
             Timer::after_millis(100).await;
         }
 
-        if let Either::Second(..) =
-            select(self.gpio_extint.wait_for_low(), Timer::after_secs(1)).await
-        {
-            defmt::warn!("EXTINT pin (TX_READY) is not being asserted");
-            return State::PowerCycle;
-        }
+        let mut buf = UbxStream::<512>::new();
+        'outer: loop {
+            if let Either::Second(..) =
+                select(self.gpio_extint.wait_for_low(), Timer::after_secs(1)).await
+            {
+                defmt::warn!("EXTINT pin (TX_READY) is not being asserted");
+                return State::PowerCycle;
+            }
 
-        let mut len = [0; 2];
-        if let Err(e) = self
-            .i2c
-            .write_read_async(MAX_M10S_I2C_ADDRESS, [0xfd_u8], &mut len)
-            .await
-        {
-            defmt::warn!("I2C operation failed ({})", e);
-            return State::PowerCycle;
-        }
+            let mut len = [0; 2];
+            if let Err(e) = self
+                .i2c
+                .write_read_async(MAX_M10S_I2C_ADDRESS, [0xfd_u8], &mut len)
+                .await
+            {
+                defmt::warn!("I2C operation failed ({})", e);
+                return State::PowerCycle;
+            }
 
-        let len = u16::from_be_bytes(len);
-        defmt::debug!("len = {}", len);
-        if len < 10 {
-            defmt::warn!("unexpected data size ({})", len);
-            return State::PowerCycle;
-        }
+            let len = u16::from_be_bytes(len) as usize;
+            defmt::debug!("len = {}", len);
 
-        let mut buf = [0; 10];
-        if let Err(e) = self.i2c.read_async(MAX_M10S_I2C_ADDRESS, &mut buf).await {
-            defmt::warn!("I2C operation failed ({})", e);
-            return State::PowerCycle;
-        }
+            if let Err(e) = self
+                .i2c
+                .read_async(MAX_M10S_I2C_ADDRESS, &mut buf.buf_unused_mut()[..len])
+                .await
+            {
+                defmt::warn!("I2C operation failed ({})", e);
+                return State::PowerCycle;
+            }
 
-        if buf != ubx_ack_ack_frame {
-            defmt::warn!("unexpected data ({}/{})", buf, ubx_ack_ack_frame);
-            return State::PowerCycle;
+            buf.commit(len);
+
+            while let Some(frame) = buf.pop() {
+                if let UbxFrame {
+                    class: 0x05, // (=UBX-ACK-ACK)
+                    id: 0x01,
+                    payload: &[0x06, 0x8a], // (=UBX-CFG-VALSET)
+                } = frame
+                {
+                    break 'outer;
+                }
+            }
         }
 
         State::Ready
