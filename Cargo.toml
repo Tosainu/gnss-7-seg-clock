@@ -15,6 +15,9 @@ path = "crates/misc"
 [workspace.dependencies.nmea]
 path = "crates/nmea"
 
+[workspace.dependencies.ubx]
+path = "crates/ubx"
+
 [workspace.dependencies.chrono]
 version = "0.4.43"
 default-features = false
