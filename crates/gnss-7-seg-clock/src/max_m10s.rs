@@ -261,7 +261,7 @@ where
                                 hour.into(),
                                 min.into(),
                                 sec.into(),
-                                (itow % 1000).into(),
+                                itow % 1000,
                             ),
                         ) {
                             sender
