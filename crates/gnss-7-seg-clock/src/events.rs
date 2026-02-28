@@ -27,6 +27,7 @@ pub struct EventSources<'d, M: RawMutex, const N: usize> {
     gpio_pps: gpio::Input<'d>,
     pub datetime: Option<NaiveDateTime>,
     pub datetime_next_pulse: Option<NaiveDateTime>,
+    pub ground_speed_meter_hour: Option<u32>,
 }
 
 impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
@@ -45,6 +46,7 @@ impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
             gpio_pps,
             datetime: None,
             datetime_next_pulse: None,
+            ground_speed_meter_hour: None,
         }
     }
 
@@ -65,6 +67,7 @@ impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
                     ground_speed_meter_hour,
                 }) => {
                     self.datetime = Some(datetime);
+                    self.ground_speed_meter_hour = Some(ground_speed_meter_hour);
                     return Event::DateTimeAndVelocity {
                         datetime,
                         ground_speed_meter_hour,
