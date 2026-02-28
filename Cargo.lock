@@ -673,7 +673,6 @@ dependencies = [
  "embassy-usb",
  "embedded-io-async",
  "misc",
- "nmea",
  "panic-probe",
  "portable-atomic",
  "postcard",

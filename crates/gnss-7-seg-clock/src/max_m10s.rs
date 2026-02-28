@@ -32,11 +32,9 @@ enum State {
 }
 
 pub enum Event {
-    DateTime(NaiveDateTime),
     DateTimeAndVelocity {
         datetime: NaiveDateTime,
         ground_speed_meter_hour: u32,
-        is_valid_fix: bool,
     },
     DateTimeNextPulse(NaiveDateTime),
 }
@@ -119,7 +117,7 @@ where
                 0x02, 0x00, 0x71, 0x10, 0x00, // CFG-I2CINPROT-NMEA (=0)
                 0x01, 0x00, 0x72, 0x10, 0x01, // CFG-I2COUTPROT-UBX (=1)
                 0x02, 0x00, 0x72, 0x10, 0x00, // CFG-I2COUTPROT-NMEA (=0)
-                0x01, 0x00, 0x73, 0x10, 0x01, // CFG-UART1INPROT-UBX (=1)
+                0x01, 0x00, 0x73, 0x10, 0x00, // CFG-UART1INPROT-UBX (=0)
                 0x02, 0x00, 0x73, 0x10, 0x00, // CFG-UART1INPROT-NMEA (=0)
                 0x01, 0x00, 0x74, 0x10, 0x01, // CFG-UART1OUTPROT-UBX (=1)
                 0x02, 0x00, 0x74, 0x10, 0x00, // CFG-UART1OUTPROT-NMEA (=0)
@@ -259,13 +257,17 @@ where
                         let ground_speed_meter_hour = gspeed_cm_s * 60 * 60 / 100;
                         if let (Some(date), Some(time)) = (
                             NaiveDate::from_ymd_opt(year.into(), month.into(), day.into()),
-                            NaiveTime::from_hms_opt(hour.into(), min.into(), sec.into()),
+                            NaiveTime::from_hms_milli_opt(
+                                hour.into(),
+                                min.into(),
+                                sec.into(),
+                                (itow % 1000).into(),
+                            ),
                         ) {
                             sender
                                 .send(Event::DateTimeAndVelocity {
                                     datetime: date.and_time(time),
                                     ground_speed_meter_hour,
-                                    is_valid_fix: (flags & 0b01) != 0,
                                 })
                                 .await;
                         }
