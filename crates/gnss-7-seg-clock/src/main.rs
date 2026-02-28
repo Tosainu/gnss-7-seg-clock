@@ -88,6 +88,25 @@ fn time_to_display_payload(time: NaiveTime) -> display::Payload {
     ])
 }
 
+fn u32_to_display_payload(value: u32) -> display::Payload {
+    let mut arr = [
+        TABLE[value as usize % 10],
+        TABLE[value as usize / 10 % 10],
+        TABLE[value as usize / 100 % 10],
+        TABLE[value as usize / 1000 % 10],
+        TABLE[value as usize / 10000 % 10],
+        TABLE[value as usize / 100000 % 10],
+    ];
+    arr[3] |= MASK_DP;
+    if value < 100_000 {
+        arr[5] = 0;
+    }
+    if value < 10_000 {
+        arr[4] = 0;
+    }
+    display::Payload(arr)
+}
+
 const FLASH_SIZE: usize = 4 * 1024 * 1024; // W25Q32JVSS
 const ADDR_OFFSET: u32 = (FLASH_SIZE - flash::ERASE_SIZE) as u32;
 
@@ -106,6 +125,7 @@ impl Config {
 enum DisplayMode {
     Time,
     Date,
+    Velocity,
     ConfigTimeZone,
 }
 
@@ -113,7 +133,8 @@ impl DisplayMode {
     fn next_state(&self) -> DisplayMode {
         match self {
             DisplayMode::Time => DisplayMode::Date,
-            DisplayMode::Date => DisplayMode::ConfigTimeZone,
+            DisplayMode::Date => DisplayMode::Velocity,
+            DisplayMode::Velocity => DisplayMode::ConfigTimeZone,
             DisplayMode::ConfigTimeZone => DisplayMode::Time,
         }
     }
@@ -186,6 +207,7 @@ async fn main(spawner: Spawner) {
         match mode {
             DisplayMode::Time => handle_mode_time(&mut es, &cfg, &mut display).await,
             DisplayMode::Date => handle_mode_date(&mut es, &cfg, &mut display).await,
+            DisplayMode::Velocity => handle_mode_velocity(&mut es, &cfg, &mut display).await,
             DisplayMode::ConfigTimeZone => {
                 let t = handle_mode_config_time_zone(&mut es, &cfg, &mut display).await;
                 if t != cfg.time_zone_secs {
@@ -202,33 +224,14 @@ fn set_leds(leds: &mut [gpio::Output<'_>; 5], mode: DisplayMode) {
     let bits = match mode {
         DisplayMode::Time => 0b0_0001_u8,
         DisplayMode::Date => 0b0_0010_u8,
+        DisplayMode::Velocity => 0b0_0011_u8,
         DisplayMode::ConfigTimeZone => 0b1_0001_u8,
     };
-    leds[0].set_level(if bits & 0b1_0000 > 0 {
-        gpio::Level::High
-    } else {
-        gpio::Level::Low
-    });
-    leds[1].set_level(if bits & 0b0_1000 > 0 {
-        gpio::Level::High
-    } else {
-        gpio::Level::Low
-    });
-    leds[2].set_level(if bits & 0b0_0100 > 0 {
-        gpio::Level::High
-    } else {
-        gpio::Level::Low
-    });
-    leds[3].set_level(if bits & 0b0_0010 > 0 {
-        gpio::Level::High
-    } else {
-        gpio::Level::Low
-    });
-    leds[4].set_level(if bits & 0b0_0001 > 0 {
-        gpio::Level::High
-    } else {
-        gpio::Level::Low
-    });
+    leds[0].set_level((bits & 0b1_0000 > 0).into());
+    leds[1].set_level((bits & 0b0_1000 > 0).into());
+    leds[2].set_level((bits & 0b0_0100 > 0).into());
+    leds[3].set_level((bits & 0b0_0010 > 0).into());
+    leds[4].set_level((bits & 0b0_0001 > 0).into());
 }
 
 async fn handle_mode_time<R: RawMutex, Spi: spi::Instance, const N: usize>(
@@ -303,6 +306,38 @@ async fn handle_mode_date<R: RawMutex, Spi: spi::Instance, const N: usize>(
                 display.shift(&date_to_display_payload(t.date())).await;
             }
             Event::TimePulse => {
+                display.refresh().await;
+            }
+            Event::Sw3Pressed => return,
+            _ => (),
+        }
+    }
+}
+
+async fn handle_mode_velocity<R: RawMutex, Spi: spi::Instance, const N: usize>(
+    es: &mut EventSources<'_, R, N>,
+    _cfg: &Config,
+    display: &mut Display<'_, Spi>,
+) {
+    if let Some(ground_speed_meter_hour) = es.ground_speed_meter_hour {
+        display
+            .shift(&u32_to_display_payload(ground_speed_meter_hour))
+            .await;
+        display.refresh().await;
+    } else {
+        display.shift(&PATTERN_NO_TIME).await;
+        display.refresh().await;
+    }
+
+    loop {
+        match es.wait().await {
+            Event::DateTimeAndVelocity {
+                ground_speed_meter_hour,
+                ..
+            } => {
+                display
+                    .shift(&u32_to_display_payload(ground_speed_meter_hour))
+                    .await;
                 display.refresh().await;
             }
             Event::Sw3Pressed => return,
