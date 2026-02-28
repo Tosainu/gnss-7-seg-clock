@@ -127,8 +127,7 @@ async fn main(_spawner: Spawner) {
                 0x01, // layers (=ram)
                 0x00, 0x00, // reserved
                 0x01, 0x00, 0x21, 0x30, 0xc8, 0x00, // CFG-RATE-MEAS (=200 ms/5 Hz)
-                0x1b, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_NAV_STATUS_UART1 (=1)
-                0x43, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_NAV_VELNED_UART1 (=1)
+                0x07, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_NAV_PVT_UART1 (=1)
                 0x7e, 0x01, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_TIM_TP_UART1 (=1)
                 0x01, 0x00, 0x71, 0x10, 0x01, // CFG-I2CINPROT-UBX (=1)
                 0x02, 0x00, 0x71, 0x10, 0x00, // CFG-I2CINPROT-NMEA (=0)
@@ -139,7 +138,8 @@ async fn main(_spawner: Spawner) {
                 0x01, 0x00, 0x74, 0x10, 0x01, // CFG-UART1OUTPROT-UBX (=1)
                 0x02, 0x00, 0x74, 0x10, 0x00, // CFG-UART1OUTPROT-NMEA (=0)
                 // CFG-UART1-BAUDRATE (=115200)
-                0x01, 0x00, 0x52, 0x40, 0x00, 0xc2, 0x01, 0x00, // payload end
+                0x01, 0x00, 0x52, 0x40, 0x00, 0xc2, 0x01, 0x00,
+                // payload end
                 0x00, // ck_a
                 0x00, // ck_b
             ];
@@ -176,56 +176,49 @@ async fn main(_spawner: Spawner) {
             );
 
             match frame {
-                // UBX-NAV-VELNED
+                // UBX-NAV-PVT
                 UbxFrame {
                     class: 0x01,
-                    id: 0x12,
+                    id: 0x07,
                     payload,
                 } => {
-                    if payload.len() != 36 {
-                        defmt::warn!("got UBX-NAV-VELNED but wrong size: {}", payload.len());
+                    if payload.len() != 92 {
+                        defmt::warn!("got UBX-NAV-PVT but wrong size: {}", payload.len());
                         continue;
                     }
 
                     let itow = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                    let year = u16::from_le_bytes([payload[4], payload[5]]);
+                    let month = payload[6];
+                    let day = payload[7];
+                    let hour = payload[8];
+                    let min = payload[9];
+                    let sec = payload[10];
+                    let gps_fix = payload[20];
+                    let flags = payload[21];
                     let gspeed_cm_s =
-                        u32::from_le_bytes([payload[20], payload[21], payload[22], payload[23]]);
+                        u32::from_le_bytes([payload[60], payload[61], payload[62], payload[63]]);
 
                     let gspeed_m_h = gspeed_cm_s * 60 * 60 / 100;
 
                     defmt::info!(
-                        "UBX-NAV-VELNED: {} ms, {} cm/s, {}.{:03} km/h",
+                        "UBX-NAV-PVT: {} ms, {:04}-{:02}-{:02} {:02}:{:02}:{:02}, {} cm/s, {}.{:03} km/h, fix = {:#04x}, flags = {:#04x}",
                         itow,
+                        year,
+                        month,
+                        day,
+                        hour,
+                        min,
+                        sec,
                         gspeed_cm_s,
                         gspeed_m_h / 1000,
                         gspeed_m_h % 1000,
+                        gps_fix,
+                        flags
                     );
 
                     display.shift(&u32_to_display_payload(gspeed_m_h)).await;
                     display.refresh().await;
-                }
-
-                // UBX-NAV-STATUS
-                UbxFrame {
-                    class: 0x01,
-                    id: 0x03,
-                    payload,
-                } => {
-                    if payload.len() != 16 {
-                        defmt::warn!("got UBX-NAV-STATUS but wrong size: {}", payload.len());
-                        continue;
-                    }
-
-                    let itow = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-                    let gps_fix = payload[4];
-                    let flags = payload[4];
-
-                    defmt::info!(
-                        "UBX-NAV-STATUS: {} ms, fix = {:#04x}, flags = {:#04x}",
-                        itow,
-                        gps_fix,
-                        flags
-                    );
 
                     leds[0].set_level(((gps_fix & 0b001) != 0).into());
                     leds[1].set_level(((gps_fix & 0b010) != 0).into());
