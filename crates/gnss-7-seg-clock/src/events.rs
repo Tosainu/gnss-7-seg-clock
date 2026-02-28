@@ -58,6 +58,11 @@ impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
                     self.datetime = Some(t);
                     return Event::DateTimeUpdated(t);
                 }
+                Either5::First(MaxM10sEvent::DateTimeAndVelocity { datetime: t, .. }) => {
+                    self.datetime = Some(t);
+                    return Event::DateTimeUpdated(t);
+                }
+                Either5::First(_) => continue,
                 Either5::Second(..) => return Event::Sw3Pressed,
                 Either5::Third(..) => return Event::Sw4Pressed,
                 Either5::Fourth(..) => return Event::Sw5Pressed,
