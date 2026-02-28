@@ -14,7 +14,7 @@ use embassy_sync::{
 };
 use static_cell::StaticCell;
 
-use chrono::{Datelike, FixedOffset, NaiveDate, NaiveTime, TimeDelta, Timelike};
+use chrono::{Datelike, FixedOffset, NaiveDate, NaiveTime, Timelike};
 
 use gnss_7_seg_clock::{
     display::{self, Display},
@@ -30,7 +30,7 @@ embassy_rp::bind_interrupts!(struct Irqs {
     UART1_IRQ => uart::BufferedInterruptHandler<UART1>;
 });
 
-type NmeaChannel = Channel<ThreadModeRawMutex, MaxM10sEvent, 8>;
+type MaxM10sEventChannel = Channel<ThreadModeRawMutex, MaxM10sEvent, 8>;
 
 //
 //     +- A -+
@@ -165,14 +165,20 @@ async fn main(spawner: Spawner) {
         )
     };
 
-    static NMEA_CHANNEL: NmeaChannel = NmeaChannel::new();
+    static MAX_M10S_EVENT_CHANNEL: MaxM10sEventChannel = MaxM10sEventChannel::new();
 
-    defmt::unwrap!(spawner.spawn(task_max_m10s(max_m10s, &NMEA_CHANNEL)));
+    defmt::unwrap!(spawner.spawn(task_max_m10s(max_m10s, &MAX_M10S_EVENT_CHANNEL)));
 
     max_m10s_pps.wait_for_low().await;
 
     let mut mode = DisplayMode::Time;
-    let mut es = EventSources::new(NMEA_CHANNEL.receiver(), sw3, sw4, sw5, max_m10s_pps);
+    let mut es = EventSources::new(
+        MAX_M10S_EVENT_CHANNEL.receiver(),
+        sw3,
+        sw4,
+        sw5,
+        max_m10s_pps,
+    );
 
     loop {
         defmt::info!("mode: {}", mode);
@@ -230,12 +236,14 @@ async fn handle_mode_time<R: RawMutex, Spi: spi::Instance, const N: usize>(
     cfg: &Config,
     display: &mut Display<'_, Spi>,
 ) {
-    if let Some(t) = es.datetime {
-        let t = t + cfg.time_zone();
-        let t_next = t + TimeDelta::seconds(1);
+    if let Some(datetime) = es.datetime {
+        let t = datetime + cfg.time_zone();
         display.shift(&time_to_display_payload(t.time())).await;
         display.refresh().await;
-        display.shift(&time_to_display_payload(t_next.time())).await;
+        if let Some(datetime_next_pulse) = es.datetime_next_pulse {
+            let t_next = datetime_next_pulse + cfg.time_zone();
+            display.shift(&time_to_display_payload(t_next.time())).await;
+        }
     } else {
         display.shift(&PATTERN_NO_TIME).await;
         display.refresh().await;
@@ -243,12 +251,16 @@ async fn handle_mode_time<R: RawMutex, Spi: spi::Instance, const N: usize>(
 
     loop {
         match es.wait().await {
-            Event::DateTimeUpdated(t) => {
-                let t = t + cfg.time_zone();
-                let t_next = t + TimeDelta::seconds(1);
+            Event::DateTimeAndVelocity { datetime, .. } => {
+                if es.datetime_next_pulse.is_none() && datetime.nanosecond() == 0 {
+                    let t = datetime + cfg.time_zone();
+                    display.shift(&time_to_display_payload(t.time())).await;
+                    display.refresh().await;
+                }
+            }
+            Event::DateTimeNextPulse(datetime) => {
+                let t = datetime + cfg.time_zone();
                 display.shift(&time_to_display_payload(t.time())).await;
-                display.refresh().await;
-                display.shift(&time_to_display_payload(t_next.time())).await;
             }
             Event::TimePulse => {
                 display.refresh().await;
@@ -264,12 +276,14 @@ async fn handle_mode_date<R: RawMutex, Spi: spi::Instance, const N: usize>(
     cfg: &Config,
     display: &mut Display<'_, Spi>,
 ) {
-    if let Some(t) = es.datetime {
-        let t = t + cfg.time_zone();
-        let t_next = t + TimeDelta::seconds(1);
+    if let Some(datetime) = es.datetime {
+        let t = datetime + cfg.time_zone();
         display.shift(&date_to_display_payload(t.date())).await;
         display.refresh().await;
-        display.shift(&date_to_display_payload(t_next.date())).await;
+        if let Some(datetime_next_pulse) = es.datetime_next_pulse {
+            let t_next = datetime_next_pulse + cfg.time_zone();
+            display.shift(&date_to_display_payload(t_next.date())).await;
+        }
     } else {
         display.shift(&PATTERN_NO_TIME).await;
         display.refresh().await;
@@ -277,12 +291,16 @@ async fn handle_mode_date<R: RawMutex, Spi: spi::Instance, const N: usize>(
 
     loop {
         match es.wait().await {
-            Event::DateTimeUpdated(t) => {
-                let t = t + cfg.time_zone();
-                let t_next = t + TimeDelta::seconds(1);
+            Event::DateTimeAndVelocity { datetime, .. } => {
+                if es.datetime_next_pulse.is_none() && datetime.nanosecond() == 0 {
+                    let t = datetime + cfg.time_zone();
+                    display.shift(&date_to_display_payload(t.date())).await;
+                    display.refresh().await;
+                }
+            }
+            Event::DateTimeNextPulse(datetime) => {
+                let t = datetime + cfg.time_zone();
                 display.shift(&date_to_display_payload(t.date())).await;
-                display.refresh().await;
-                display.shift(&date_to_display_payload(t_next.date())).await;
             }
             Event::TimePulse => {
                 display.refresh().await;
@@ -329,6 +347,9 @@ async fn handle_mode_config_time_zone<R: RawMutex, Spi: spi::Instance, const N: 
 }
 
 #[embassy_executor::task]
-async fn task_max_m10s(mut max_m10s: MaxM10s<'static, I2C1>, channel: &'static NmeaChannel) {
+async fn task_max_m10s(
+    mut max_m10s: MaxM10s<'static, I2C1>,
+    channel: &'static MaxM10sEventChannel,
+) {
     max_m10s.run(channel.sender()).await;
 }

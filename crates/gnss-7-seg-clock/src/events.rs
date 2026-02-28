@@ -8,7 +8,11 @@ use chrono::NaiveDateTime;
 use crate::max_m10s::Event as MaxM10sEvent;
 
 pub enum Event {
-    DateTimeUpdated(NaiveDateTime),
+    DateTimeAndVelocity {
+        datetime: NaiveDateTime,
+        ground_speed_meter_hour: u32,
+    },
+    DateTimeNextPulse(NaiveDateTime),
     Sw3Pressed,
     Sw4Pressed,
     Sw5Pressed,
@@ -22,6 +26,7 @@ pub struct EventSources<'d, M: RawMutex, const N: usize> {
     gpio_sw5: DebouncedInput<'d>,
     gpio_pps: gpio::Input<'d>,
     pub datetime: Option<NaiveDateTime>,
+    pub datetime_next_pulse: Option<NaiveDateTime>,
 }
 
 impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
@@ -39,6 +44,7 @@ impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
             gpio_sw5: DebouncedInput(gpio_sw5),
             gpio_pps,
             datetime: None,
+            datetime_next_pulse: None,
         }
     }
 
@@ -54,19 +60,27 @@ impl<'d, M: RawMutex, const N: usize> EventSources<'d, M, N> {
             )
             .await
             {
-                Either5::First(MaxM10sEvent::DateTime(t)) => {
-                    self.datetime = Some(t);
-                    return Event::DateTimeUpdated(t);
+                Either5::First(MaxM10sEvent::DateTimeAndVelocity {
+                    datetime,
+                    ground_speed_meter_hour,
+                }) => {
+                    self.datetime = Some(datetime);
+                    return Event::DateTimeAndVelocity {
+                        datetime,
+                        ground_speed_meter_hour,
+                    };
                 }
-                Either5::First(MaxM10sEvent::DateTimeAndVelocity { datetime: t, .. }) => {
-                    self.datetime = Some(t);
-                    return Event::DateTimeUpdated(t);
+                Either5::First(MaxM10sEvent::DateTimeNextPulse(datetime)) => {
+                    self.datetime_next_pulse = Some(datetime);
+                    return Event::DateTimeNextPulse(datetime);
                 }
-                Either5::First(_) => continue,
                 Either5::Second(..) => return Event::Sw3Pressed,
                 Either5::Third(..) => return Event::Sw4Pressed,
                 Either5::Fourth(..) => return Event::Sw5Pressed,
-                Either5::Fifth(..) => return Event::TimePulse,
+                Either5::Fifth(..) => {
+                    self.datetime_next_pulse = None;
+                    return Event::TimePulse;
+                }
             }
         }
     }
