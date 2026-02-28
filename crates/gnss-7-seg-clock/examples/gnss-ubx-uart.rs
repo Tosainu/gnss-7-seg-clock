@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+use chrono::{Datelike, TimeDelta, Timelike};
 use embassy_executor::Spawner;
 use embassy_rp::gpio;
 use embassy_rp::i2c;
@@ -43,6 +44,10 @@ const TABLE: [u8; 10] = [
 ];
 
 const MASK_DP: u8 = 0b00100000;
+
+const GPS_EPOCH: chrono::NaiveDateTime = chrono::NaiveDate::from_ymd_opt(1980, 1, 6)
+    .unwrap()
+    .and_time(chrono::NaiveTime::MIN);
 
 fn u32_to_display_payload(value: u32) -> display::Payload {
     let mut arr = [
@@ -124,6 +129,7 @@ async fn main(_spawner: Spawner) {
                 0x01, 0x00, 0x21, 0x30, 0xc8, 0x00, // CFG-RATE-MEAS (=200 ms/5 Hz)
                 0x1b, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_NAV_STATUS_UART1 (=1)
                 0x43, 0x00, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_NAV_VELNED_UART1 (=1)
+                0x7e, 0x01, 0x91, 0x20, 0x01, // CFG-MSGOUT-UBX_TIM_TP_UART1 (=1)
                 0x01, 0x00, 0x71, 0x10, 0x01, // CFG-I2CINPROT-UBX (=1)
                 0x02, 0x00, 0x71, 0x10, 0x00, // CFG-I2CINPROT-NMEA (=0)
                 0x01, 0x00, 0x72, 0x10, 0x01, // CFG-I2COUTPROT-UBX (=1)
@@ -227,6 +233,48 @@ async fn main(_spawner: Spawner) {
 
                     leds[3].set_level(((flags & 0b01) != 0).into());
                     leds[4].set_level(((flags & 0b10) != 0).into());
+                }
+
+                // UBX-TIM-TP
+                UbxFrame {
+                    class: 0x0d,
+                    id: 0x01,
+                    payload,
+                } => {
+                    if payload.len() != 16 {
+                        defmt::warn!("got UBX-TIM-TP but wrong size: {}", payload.len());
+                        continue;
+                    }
+
+                    let towms =
+                        u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                    let towsubms =
+                        u32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]);
+                    let week = u16::from_le_bytes([payload[12], payload[13]]);
+                    let flags = payload[14];
+
+                    defmt::debug!(
+                        "UBX-TIM-TP: {} ms, {} ms, week = {}, flags = {:#04x}",
+                        towms,
+                        towsubms,
+                        week,
+                        flags,
+                    );
+
+                    if (flags & 0x03) == 0x03 && towsubms == 0 {
+                        let time = GPS_EPOCH
+                            + TimeDelta::weeks(week.into())
+                            + TimeDelta::milliseconds(towms.into());
+                        defmt::info!(
+                            "UBX-TIM-TP: {:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+                            time.year(),
+                            time.month(),
+                            time.day(),
+                            time.hour(),
+                            time.minute(),
+                            time.second()
+                        )
+                    }
                 }
 
                 _ => (),
