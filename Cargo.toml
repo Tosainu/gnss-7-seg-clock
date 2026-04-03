@@ -67,7 +67,7 @@ features = [
 ]
 
 [workspace.dependencies.embassy-usb]
-version = "0.5.1"
+version = "0.6.0"
 default-features = false
 features = ["defmt"]
 
