@@ -171,7 +171,7 @@ async fn main(spawner: Spawner) {
 
     static NMEA_CHANNEL: NmeaChannel = NmeaChannel::new();
 
-    defmt::unwrap!(spawner.spawn(task_max_m10s(max_m10s, &NMEA_CHANNEL)));
+    spawner.spawn(defmt::unwrap!(task_max_m10s(max_m10s, &NMEA_CHANNEL)));
 
     max_m10s_pps.wait_for_low().await;
 

@@ -93,7 +93,7 @@ async fn main(spawner: Spawner) {
         CdcAcmClass::new(&mut usb_builder, state, 64)
     };
 
-    defmt::unwrap!(spawner.spawn(usb(usb_builder.build())));
+    spawner.spawn(defmt::unwrap!(usb(usb_builder.build())));
 
     usb_cdc_acm.wait_connection().await;
     defmt::info!("usb ready");
