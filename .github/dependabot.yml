@@ -10,6 +10,11 @@ updates:
       - '/crates/**/*'
     schedule:
       interval: monthly
+    groups:
+      embassy:
+        patterns:
+          - embassy-*
+    open-pull-requests-limit: 50
   - package-ecosystem: docker
     directory: /
     schedule:
