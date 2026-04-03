@@ -62,7 +62,7 @@ where
         gpio_extint: Peri<'d, impl gpio::Pin>,
         irq: impl Binding<Uart::Interrupt, uart::BufferedInterruptHandler<Uart>>
         + Binding<I2c::Interrupt, i2c::InterruptHandler<I2c>>
-        + Copy,
+        + 'd,
     ) -> Self {
         let uart_config = {
             let mut c = uart::Config::default();

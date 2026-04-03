@@ -1,4 +1,4 @@
-use embassy_rp::{Peri, dma, gpio, spi};
+use embassy_rp::{Peri, dma, gpio, interrupt::typelevel::Binding, spi};
 use embassy_time::Timer;
 
 pub struct Payload(pub [u8; 6]);
@@ -16,13 +16,14 @@ impl<'d, Spi> Display<'d, Spi>
 where
     Spi: spi::Instance,
 {
-    pub fn new(
+    pub fn new<TxDma: dma::ChannelInstance>(
         spi: Peri<'d, Spi>,
         spi_clk: Peri<'d, impl spi::ClkPin<Spi>>,
         spi_tx: Peri<'d, impl spi::MosiPin<Spi>>,
-        spi_tx_dma: Peri<'d, impl dma::Channel>,
+        spi_tx_dma: Peri<'d, TxDma>,
         gpio_noe: Peri<'d, impl gpio::Pin>,
         gpio_le: Peri<'d, impl gpio::Pin>,
+        irq: impl Binding<TxDma::Interrupt, dma::InterruptHandler<TxDma>> + 'd,
     ) -> Self {
         let spi_config = {
             let mut c = spi::Config::default();
@@ -32,7 +33,7 @@ where
             c
         };
         Self {
-            spi: spi::Spi::new_txonly(spi, spi_clk, spi_tx, spi_tx_dma, spi_config),
+            spi: spi::Spi::new_txonly(spi, spi_clk, spi_tx, spi_tx_dma, irq, spi_config),
             gpio_noe: gpio::Output::new(gpio_noe, gpio::Level::High),
             gpio_le: gpio::Output::new(gpio_le, gpio::Level::Low),
         }

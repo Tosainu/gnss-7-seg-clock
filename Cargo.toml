@@ -72,8 +72,8 @@ default-features = false
 features = ["defmt"]
 
 [workspace.dependencies.embedded-io-async]
-version = "0.6.1"
-features = ["defmt-03"]
+version = "0.7.0"
+features = ["defmt"]
 
 [workspace.dependencies.nom]
 version = "8.0.0"

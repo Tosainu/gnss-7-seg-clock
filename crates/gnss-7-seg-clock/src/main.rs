@@ -2,10 +2,11 @@
 #![no_main]
 
 use embassy_executor::Spawner;
+use embassy_rp::dma;
 use embassy_rp::flash;
 use embassy_rp::gpio;
 use embassy_rp::i2c;
-use embassy_rp::peripherals::{I2C1, UART1};
+use embassy_rp::peripherals::{DMA_CH0, I2C1, UART1};
 use embassy_rp::spi;
 use embassy_rp::uart;
 use embassy_sync::{
@@ -26,6 +27,7 @@ use gnss_7_seg_clock::{
 use {defmt_rtt as _, panic_probe as _};
 
 embassy_rp::bind_interrupts!(struct Irqs {
+    DMA_IRQ_0 => dma::InterruptHandler<DMA_CH0>;
     I2C1_IRQ => i2c::InterruptHandler<I2C1>;
     UART1_IRQ => uart::BufferedInterruptHandler<UART1>;
 });
@@ -142,7 +144,9 @@ async fn main(spawner: Spawner) {
     ];
 
     let _spi1_rx = gpio::Input::new(p.PIN_12, gpio::Pull::Down);
-    let mut display = Display::new(p.SPI1, p.PIN_14, p.PIN_15, p.DMA_CH0, p.PIN_11, p.PIN_13);
+    let mut display = Display::new(
+        p.SPI1, p.PIN_14, p.PIN_15, p.DMA_CH0, p.PIN_11, p.PIN_13, Irqs,
+    );
 
     display.shift(&PATTERN_NO_TIME).await;
     display.refresh().await;
