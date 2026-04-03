@@ -60,7 +60,7 @@ version = "0.8.0"
 features = ["defmt"]
 
 [workspace.dependencies.embassy-time]
-version = "0.5.0"
+version = "0.5.1"
 features = [
   "defmt",
   "defmt-timestamp-uptime"
