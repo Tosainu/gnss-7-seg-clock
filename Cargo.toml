@@ -32,12 +32,12 @@ version = "1.0.1"
 version = "1.1.0"
 
 [workspace.dependencies.embassy-executor]
-version = "0.9.1"
+version = "0.10.0"
 features = [
-  "arch-cortex-m",
   "defmt",
   "executor-interrupt",
   "executor-thread",
+  "platform-cortex-m",
 ]
 
 [workspace.dependencies.embassy-futures]

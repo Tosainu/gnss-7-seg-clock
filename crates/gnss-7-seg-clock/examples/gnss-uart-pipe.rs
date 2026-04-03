@@ -76,9 +76,9 @@ async fn main(spawner: Spawner) {
     }
     .split();
 
-    defmt::unwrap!(spawner.spawn(usb(usb_builder.build())));
-    defmt::unwrap!(spawner.spawn(uart1_to_usb(uart1_rx, usb_cdc_acm_tx)));
-    defmt::unwrap!(spawner.spawn(usb_to_uart1(usb_cdc_acm_rx, uart1_tx)));
+    spawner.spawn(defmt::unwrap!(usb(usb_builder.build())));
+    spawner.spawn(defmt::unwrap!(uart1_to_usb(uart1_rx, usb_cdc_acm_tx)));
+    spawner.spawn(defmt::unwrap!(usb_to_uart1(usb_cdc_acm_rx, uart1_tx)));
 
     loop {
         sw3.wait_for_falling_edge().await;
