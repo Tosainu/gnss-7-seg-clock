@@ -2,11 +2,17 @@
 #![no_main]
 
 use embassy_executor::Spawner;
+use embassy_rp::dma;
 use embassy_rp::gpio;
+use embassy_rp::peripherals::DMA_CH0;
 use embassy_rp::spi;
 use embassy_time::Timer;
 
 use {defmt_rtt as _, panic_probe as _};
+
+embassy_rp::bind_interrupts!(struct Irqs {
+    DMA_IRQ_0 => dma::InterruptHandler<DMA_CH0>;
+});
 
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) {
@@ -19,13 +25,13 @@ async fn main(_spawner: Spawner) {
         c.polarity = spi::Polarity::IdleLow;
         c
     };
-    let mut display_spi = spi::Spi::new(
+    let _display_spi1_rx = gpio::Input::new(p.PIN_12, gpio::Pull::Down);
+    let mut display_spi = spi::Spi::new_txonly(
         p.SPI1,
         p.PIN_14,
         p.PIN_15,
-        p.PIN_12,
         p.DMA_CH0,
-        p.DMA_CH1,
+        Irqs,
         display_spi_config,
     );
 
