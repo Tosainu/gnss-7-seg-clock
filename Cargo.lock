@@ -735,12 +735,12 @@ dependencies = [
  "embassy-usb",
  "embedded-io-async 0.7.0",
  "misc",
- "nmea",
  "panic-probe",
  "portable-atomic",
  "postcard",
  "serde",
  "static_cell",
+ "ubx",
 ]
 
 [[package]]
@@ -940,24 +940,6 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
-
-[[package]]
-name = "nmea"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "defmt",
- "nom",
-]
-
-[[package]]
-name = "nom"
-version = "8.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "nu-ansi-term"
@@ -1574,6 +1556,10 @@ name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
+
+[[package]]
+name = "ubx"
+version = "0.1.0"
 
 [[package]]
 name = "unicode-ident"
