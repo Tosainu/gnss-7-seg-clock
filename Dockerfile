@@ -1,4 +1,4 @@
-FROM ghcr.io/kicad/kicad:10.0.0@sha256:9549d3a08e0822f9434a9eda0782c812451ab4a733c73535f9e8beed42039bc3 AS kicad
+FROM ghcr.io/kicad/kicad:10.0.1@sha256:90241570e363ac3bfb02008407bcc95f1f7914bb2bd42cdec093966bbf353397 AS kicad
 WORKDIR /work
 
 
